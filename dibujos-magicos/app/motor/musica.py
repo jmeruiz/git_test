@@ -99,13 +99,6 @@ CANCIONES = {
 }
 
 CANCIONES.update({
-    "cumple": {
-        "nombre": "Cumpleaños feliz", "icono": "🎂", "bpm": 100, "compas": 3, "estilo": "vals", "instrumento": "marimba",
-        "intro": _m("R:2 G4:.75 G4:.25"), "intro_acordes": _m("C:3"),
-        "melodia": _m("""A4:1 G4:1 C5:1  B4:2 G4:.75 G4:.25  A4:1 G4:1 D5:1  C5:2 G4:.75 G4:.25
-                         G5:1 E5:1 C5:1  B4:1 A4:1 F5:.75 F5:.25  E5:1 C5:1 D5:1  C5:2 G4:.75 G4:.25"""),
-        "acordes": _m("C:3 G:3 G:3 C:3 C:3 F:3 C:2 G:1 C:3"),
-    },
     "martinillo": {
         "nombre": "Martinillo", "icono": "🔔", "bpm": 112, "compas": 4, "estilo": "suave", "instrumento": "xilofono",
         "melodia": _m("""C5:1 D5:1 E5:1 C5:1  C5:1 D5:1 E5:1 C5:1  E5:1 F5:1 G5:2  E5:1 F5:1 G5:2

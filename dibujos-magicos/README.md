@@ -77,7 +77,6 @@ Cada movimiento trae una canción sugerida, y se puede cambiar (tocar una canci�
 | 🪇 La cucaracha | dab, bambolear |
 | 🎉 Fiesta de colores | bailar, menearse |
 | 🐸 Saltarín | saltar, brincos, rebotar |
-| 🎂 Cumpleaños feliz | ¡videos de cumpleaños! |
 | 🔔 Martinillo | tranquila, para cantar |
 | 🎻 Himno de la alegría | tranquila |
 | 🐮 El viejo MacDonald | saltar, rebotar |
