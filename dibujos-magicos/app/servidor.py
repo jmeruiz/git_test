@@ -109,32 +109,46 @@ def publico(info):
 
 # ------------------------------------------------------------------ trabajador
 
+MANEJADORES = {}  # tipo de trabajo -> función; se llenan abajo
+
+
+def procesar(tid):
+    """Hace un trabajo de la cola y guarda su resultado (o su error) en `trabajos`."""
+    t = trabajos[tid]
+    t["estado"] = "trabajando"
+    t["inicio"] = time.time()
+    try:
+        MANEJADORES[t["tipo"]](t)
+        t["estado"] = "listo"
+        t["progreso"] = 100
+    except Exception as e:  # noqa: BLE001 — cualquier error se le muestra al usuario
+        logging.exception("Trabajo %s falló", tid)
+        t["estado"] = "error"
+        t["mensaje"] = str(e) or e.__class__.__name__
+        if t["tipo"] == "anotar":
+            actualizar_info(PERSONAJES / t["personaje"], estado="error", mensaje=t["mensaje"])
+        if t["tipo"] == "fiesta":
+            actualizar_info(FIESTAS / t["fiesta"], estado="error", mensaje=t["mensaje"])
+    finally:
+        t["fin"] = time.time()
+
+
 def trabajador():
+    """Hilo que hace los trabajos de uno en uno (crear videos usa todo el procesador)."""
     while True:
         tid = cola.get()
-        t = trabajos[tid]
-        t["estado"] = "trabajando"
-        t["inicio"] = time.time()
         try:
-            if t["tipo"] == "anotar":
-                hacer_anotacion(t)
-            elif t["tipo"] == "fiesta":
-                hacer_fiesta(t)
-            else:
-                hacer_video(t)
-            t["estado"] = "listo"
-            t["progreso"] = 100
-        except Exception as e:  # noqa: BLE001 — cualquier error se le muestra al usuario
-            logging.exception("Trabajo %s falló", tid)
-            t["estado"] = "error"
-            t["mensaje"] = str(e) or e.__class__.__name__
-            if t["tipo"] == "anotar":
-                actualizar_info(PERSONAJES / t["personaje"], estado="error", mensaje=t["mensaje"])
-            if t["tipo"] == "fiesta":
-                actualizar_info(FIESTAS / t["fiesta"], estado="error", mensaje=t["mensaje"])
+            procesar(tid)
         finally:
-            t["fin"] = time.time()
             cola.task_done()
+
+
+def procesar_pendientes():
+    """Hace ahora mismo todo lo que está en la cola. Para las pruebas."""
+    while not cola.empty():
+        tid = cola.get()
+        procesar(tid)
+        cola.task_done()
 
 
 def hacer_anotacion(t):
@@ -142,7 +156,7 @@ def hacer_anotacion(t):
     try:
         res = anotar(c / "foto.jpg", c)
     except ErrorAnotacion as e:
-        raise RuntimeError(str(e))
+        raise RuntimeError(str(e)) from e
     info = leer_info(c)
     actualizar_info(c, estado="revisar", ia=res, ancho=res["ancho"], alto=res["alto"],
                     version=info.get("version", 0) + 1, mensaje="")
@@ -201,6 +215,9 @@ def hacer_fiesta(t):
               "salida": str(c / "fiesta.mp4"), "miniatura": str(c / "fiesta.jpg")}
     correr_render(t, escena, c)
     actualizar_info(c, estado="listo", mensaje="")
+
+
+MANEJADORES.update(anotar=hacer_anotacion, video=hacer_video, fiesta=hacer_fiesta)
 
 
 def pista_error(texto):

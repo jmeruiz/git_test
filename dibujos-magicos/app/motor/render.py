@@ -240,7 +240,7 @@ def transformar(img, sx=1.0, sy=1.0, angulo=0.0, onda=0.0):
 
 def chispitas(fondo, t, n=14, semilla=7):
     rng = np.random.RandomState(semilla)
-    for i in range(n):
+    for _ in range(n):
         x = rng.uniform(0.15, 0.85) * ANCHO
         y = rng.uniform(0.1, 0.8) * ALTO
         fase = rng.uniform(0, 2 * math.pi)

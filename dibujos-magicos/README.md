@@ -141,6 +141,8 @@ Para ver qué está pasando por dentro: en Docker Desktop → Containers → `di
 
 ## Para curiosos: cómo funciona
 
+Para cambiar o agrandar el proyecto (pruebas, modo desarrollo, cómo agregar canciones o fondos), vean [DESARROLLO.md](DESARROLLO.md).
+
 - **`modelos/`**: los dos modelos de IA de [Animated Drawings de Meta](https://github.com/facebookresearch/AnimatedDrawings) (licencia MIT), servidos con TorchServe. Uno encuentra el dibujo en la foto y el otro adivina los 17 puntos del cuerpo.
 - **`app/`**: la página web (Flask) y el motor.
   - `motor/anotar.py`: recorta el dibujo del papel, blanquea el papel y arma el esqueleto. Si la IA no encuentra nada, usa la tinta del papel y un esqueleto de plantilla.

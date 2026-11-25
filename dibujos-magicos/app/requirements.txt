@@ -1,2 +1,4 @@
 waitress==3.0.0
 qrcode==7.4.2
+# Flask 2.3 (lo fija Animated Drawings) no funciona con Werkzeug 3.1 o más nuevo
+Werkzeug==3.0.6

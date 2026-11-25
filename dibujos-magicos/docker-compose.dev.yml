@@ -1,0 +1,13 @@
+# Modo desarrollo: ./dev.sh arrancar
+# - el código de app/ se usa directo desde la carpeta (cambiar código = ./dev.sh reiniciar, sin reconstruir)
+# - la imagen de app trae pytest y ruff
+# - los datos de desarrollo van aparte (datos-dev/) para no mezclarlos con los dibujos de verdad
+services:
+  app:
+    build:
+      args:
+        DEV: "1"
+    image: dibujos-magicos-app:dev
+    volumes:
+      - ./app:/srv/app
+      - ./datos-dev:/datos

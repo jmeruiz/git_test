@@ -1,0 +1,32 @@
+# Corre la revisión de estilo y las pruebas de Dibujos Mágicos en cada cambio.
+# No usa Docker ni la IA: las pruebas que necesitan Animated Drawings se saltan solas aquí
+# y se corren en la computadora con ./dev.sh pruebas.
+name: Dibujos Mágicos
+
+on:
+  push:
+    paths: ["dibujos-magicos/**", ".github/workflows/dibujos-magicos.yml"]
+  pull_request:
+    paths: ["dibujos-magicos/**", ".github/workflows/dibujos-magicos.yml"]
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: dibujos-magicos/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"   # la misma que el contenedor
+          cache: pip
+          cache-dependency-path: dibujos-magicos/app/requirements*.txt
+      - name: Instalar ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Instalar dependencias
+        run: pip install -r requirements-ci.txt
+      - name: Revisar estilo
+        run: ruff check . --output-format github
+      - name: Pruebas
+        run: python -m pytest -v

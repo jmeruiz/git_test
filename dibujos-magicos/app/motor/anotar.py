@@ -107,16 +107,22 @@ def mascara_tinta(img_bgr):
     return mascara
 
 
-def blanquear_papel(img_bgr):
+def blanquear_papel(img_bgr, mascara):
     """
-    Hace que el papel se vea blanco parejo (quita sombras y el tono gris de la foto)
-    sin cambiar los colores del dibujo: divide cada canal entre una estimación del papel.
+    Hace que el papel se vea blanco parejo (quita sombras y el tono gris de la foto) sin cambiar
+    los colores del dibujo. Calcula cómo se ve el papel "debajo" del dibujo rellenándolo con el
+    papel de alrededor, y divide la foto entre eso. Como usa la máscara, ni las zonas grandes
+    pintadas de un solo color se confunden con papel.
     """
-    k = max(15, (min(img_bgr.shape[:2]) // 20) | 1)
-    papel = cv2.morphologyEx(img_bgr, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    papel = cv2.GaussianBlur(papel, (0, 0), k / 2)
-    limpio = np.clip(img_bgr.astype(np.float32) / np.maximum(papel.astype(np.float32), 1) * 255 * 1.03, 0, 255)
-    return limpio.astype(np.uint8)
+    h, w = img_bgr.shape[:2]
+    escala = min(1.0, 160 / max(h, w))
+    chica = cv2.resize(img_bgr, (max(2, int(w * escala)), max(2, int(h * escala))), interpolation=cv2.INTER_AREA)
+    m = cv2.resize(mascara, (chica.shape[1], chica.shape[0]), interpolation=cv2.INTER_NEAREST)
+    m = cv2.dilate((m > 0).astype(np.uint8) * 255, np.ones((3, 3), np.uint8), iterations=2)
+    papel = cv2.inpaint(chica, m, 7, cv2.INPAINT_TELEA) if 0 < m.mean() < 250 else np.full_like(chica, 255)
+    papel = cv2.GaussianBlur(cv2.resize(papel, (w, h), interpolation=cv2.INTER_LINEAR), (0, 0), max(3, max(h, w) / 60))
+    limpio = img_bgr.astype(np.float32) / np.maximum(papel.astype(np.float32), 1) * 255 * 1.03
+    return np.clip(limpio, 0, 255).astype(np.uint8)
 
 
 def _caja(mascara, margen=0.04):
@@ -124,20 +130,21 @@ def _caja(mascara, margen=0.04):
     if len(xs) == 0:
         raise ErrorAnotacion("La máscara quedó vacía.")
     h, w = mascara.shape
-    l, r, t, b = xs.min(), xs.max(), ys.min(), ys.max()
-    mx, my = int((r - l) * margen) + 4, int((b - t) * margen) + 4
-    return max(0, l - mx), max(0, t - my), min(w, r + mx + 1), min(h, b + my + 1)
+    izq, der, arr, aba = xs.min(), xs.max(), ys.min(), ys.max()
+    mx, my = int((der - izq) * margen) + 4, int((aba - arr) * margen) + 4
+    return max(0, izq - mx), max(0, arr - my), min(w, der + mx + 1), min(h, aba + my + 1)
 
 
 def esqueleto_plantilla(mascara):
-    l, t, r, b = _caja(mascara, margen=0)
-    bw, bh = r - l, b - t
-    return {n: [int(l + fx * bw), int(t + fy * bh)] for n, (fx, fy) in PLANTILLA.items()}
+    izq, arr, der, aba = _caja(mascara, margen=0)
+    bw, bh = der - izq, aba - arr
+    return {n: [int(izq + fx * bw), int(arr + fy * bh)] for n, (fx, fy) in PLANTILLA.items()}
 
 
 def esqueleto_desde_puntos(k):
     """Convierte los 17 puntos COCO del modelo de pose al esqueleto de Animated Drawings."""
-    p = lambda a: [int(round(v)) for v in a]
+    def p(a):
+        return [int(round(v)) for v in a]
     return {
         "root": p((k[11] + k[12]) / 2), "hip": p((k[11] + k[12]) / 2), "torso": p((k[5] + k[6]) / 2),
         "neck": p(k[0]),
@@ -193,9 +200,9 @@ def anotar(ruta_foto, carpeta):
             dets = _predecir("drawn_humanoid_detector", img)
             dets.sort(key=lambda d: d["score"], reverse=True)
             if dets and dets[0]["score"] >= 0.3:
-                l, t, r, b = [int(round(v)) for v in dets[0]["bbox"]]
-                mx, my = int((r - l) * 0.03), int((b - t) * 0.03)
-                caja = (max(0, l - mx), max(0, t - my), min(w, r + mx), min(h, b + my))
+                izq, arr, der, aba = [int(round(v)) for v in dets[0]["bbox"]]
+                mx, my = int((der - izq) * 0.03), int((aba - arr) * 0.03)
+                caja = (max(0, izq - mx), max(0, arr - my), min(w, der + mx), min(h, aba + my))
                 resultado["ia_detecto"] = True
                 resultado["confianza"] = round(float(dets[0]["score"]), 2)
         except (requests.RequestException, ErrorAnotacion, KeyError, ValueError) as e:
@@ -204,8 +211,8 @@ def anotar(ruta_foto, carpeta):
     if caja is None:
         caja = _caja(mascara_tinta(img))
 
-    l, t, r, b = caja
-    recorte = img[t:b, l:r].copy()
+    izq, arr, der, aba = caja
+    recorte = img[arr:aba, izq:der].copy()
     if recorte.shape[0] < 20 or recorte.shape[1] < 20:
         raise ErrorAnotacion("El dibujo salió demasiado pequeño en la foto.")
     mascara = mascara_tinta(recorte)
@@ -231,7 +238,7 @@ def anotar(ruta_foto, carpeta):
     if puntos is None:
         puntos = esqueleto_plantilla(mascara)
 
-    cv2.imwrite(str(carpeta / "texture.png"), cv2.cvtColor(blanquear_papel(recorte), cv2.COLOR_BGR2BGRA))
+    cv2.imwrite(str(carpeta / "texture.png"), cv2.cvtColor(blanquear_papel(recorte, mascara), cv2.COLOR_BGR2BGRA))
     cv2.imwrite(str(carpeta / "mask.png"), mascara)
     guardar_char_cfg(carpeta, puntos, recorte.shape[1], recorte.shape[0])
     resultado.update({"ancho": recorte.shape[1], "alto": recorte.shape[0]})

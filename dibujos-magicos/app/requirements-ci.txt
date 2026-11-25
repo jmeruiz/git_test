@@ -1,0 +1,11 @@
+# Para correr las pruebas rápidas sin Docker (por ejemplo en GitHub Actions).
+# Mismas versiones que instala Animated Drawings en el contenedor, pero sin OpenGL ni Animated Drawings.
+numpy==1.24.4
+scipy==1.10.0
+opencv-python-headless==4.6.0.66
+Pillow==10.1.0
+PyYAML==6.0.1
+requests==2.31.0
+Flask==2.3.2
+-r requirements.txt
+-r requirements-dev.txt

@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 130
+target-version = "py38"   # el contenedor usa Python 3.8 (lo pide Animated Drawings)
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP"]
+ignore = ["UP006", "UP035"]  # en 3.8 no se puede usar list[str] en todas partes
+
+[tool.ruff.lint.per-file-ignores]
+"motor/catalogo.py" = ["E501"]  # tablas: una fila por movimiento se lee mejor
+
+[tool.pytest.ini_options]
+testpaths = ["pruebas"]
+filterwarnings = ["ignore:The '__version__' attribute is deprecated:DeprecationWarning"]
+markers = [
+    "lento: tarda varios segundos (crea videos de verdad)",
+    "necesita_ad: necesita Animated Drawings (solo dentro del contenedor)",
+]

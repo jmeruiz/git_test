@@ -1,0 +1,3 @@
+# Solo para desarrollar y probar (no se instala en la versión normal)
+pytest==8.3.4
+ruff==0.8.4
