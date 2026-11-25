@@ -42,6 +42,8 @@ for _c in (PERSONAJES, FIESTAS, CACHE):
     _c.mkdir(parents=True, exist_ok=True)
 DIRECCION_LAN = os.environ.get("DIRECCION_LAN", "").strip()
 PUERTO = int(os.environ.get("PUERTO", "8000"))
+# El puerto por el que se entra desde afuera del contenedor (puede ser otro, ver .env)
+PUERTO_PUBLICO = int(os.environ.get("PUERTO_PUBLICO", PUERTO))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 app = Flask(__name__, static_folder=str(AQUI / "static"), static_url_path="/static")
@@ -278,7 +280,7 @@ def salud():
 @app.get("/api/estado")
 def estado():
     return jsonify(modelos=modelos_listos(), direccion_lan=DIRECCION_LAN,
-                   url_telefono=f"http://{DIRECCION_LAN}:{PUERTO}" if DIRECCION_LAN else "",
+                   url_telefono=f"http://{DIRECCION_LAN}:{PUERTO_PUBLICO}" if DIRECCION_LAN else "",
                    en_cola=sum(1 for t in trabajos.values() if t["estado"] in ("en_cola", "trabajando")))
 
 

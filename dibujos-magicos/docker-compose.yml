@@ -1,6 +1,8 @@
 # Dibujos Mágicos: dos "cajitas" (contenedores) que corren en su computadora.
 #   modelos -> la IA de Meta que encuentra el dibujo y sus brazos/piernas
 #   app     -> la página web (http://localhost:8000) y el motor que crea los videos
+#
+# Si el puerto 8000 ya lo usa otro programa, creen un archivo .env junto a este con: PUERTO=8010
 name: dibujos-magicos
 services:
   modelos:
@@ -15,10 +17,11 @@ services:
     depends_on:
       - modelos
     ports:
-      - "8000:8000"
+      - "${PUERTO:-8000}:8000"
     environment:
       # La dirección de la compu en el WiFi (la pone el lanzador) para mostrar el código QR
       DIRECCION_LAN: ${DIRECCION_LAN:-}
+      PUERTO_PUBLICO: ${PUERTO:-8000}
     volumes:
       # Aquí se guardan las fotos y los videos, en la carpeta "datos" junto a este archivo
       - ./datos:/datos
