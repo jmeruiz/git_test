@@ -18,7 +18,7 @@ def subir(srv, nombre, titulo="Prueba"):
 
 
 def test_paginas_y_catalogo(servidor):
-    for ruta in ("/", "/nuevo", "/fiesta", "/funcion", "/personaje/abc"):
+    for ruta in ("/", "/nuevo", "/fiesta", "/funcion", "/ayuda", "/personaje/abc", "/static/manifest.webmanifest"):
         assert servidor.cliente.get(ruta).status_code == 200
     cat = servidor.cliente.get("/api/catalogo").json
     assert {"esqueleto", "gelatina", "fondos", "musica"} <= set(cat)

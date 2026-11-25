@@ -263,6 +263,11 @@ def pagina_fiesta():
     return send_from_directory(app.static_folder, "fiesta.html")
 
 
+@app.get("/ayuda")
+def pagina_ayuda():
+    return send_from_directory(app.static_folder, "ayuda.html")
+
+
 @app.get("/datos/<path:ruta>")
 def archivos_datos(ruta):
     r = send_from_directory(DATOS, ruta)

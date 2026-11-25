@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guía de Dibujos Mágicos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="/static/logo.svg">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#fffdf7">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;700;800&display=swap">
+<!-- INICIO-ESTILO -->
+<style>
+/* Cuaderno de crayolas: papel cálido, una sola columna de lectura, capturas en marco de celular. Tema claro a propósito (como la app). */
+:root{
+  --papel:#fffdf7; --hoja:#ffffff; --tinta:#2a2440; --suave:#625c7a; --linea:#ebe5d6;
+  --azul:#3a6fe0; --naranja:#f07a2b; --verde:#1f9e68; --amarillo:#ffc93c; --rosa:#e8517f;
+  --titulo:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --texto:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--papel);color:var(--tinta);font-family:var(--texto);font-size:17px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:1.2rem 4rem}
+.hoja{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:2.6rem}
+h1,h2,h3{font-family:var(--titulo);line-height:1.1;margin:0;text-wrap:balance}
+h1{font-size:clamp(2.1rem,7vw,3.2rem);font-weight:800}
+h2{font-size:clamp(1.5rem,4.6vw,2rem);font-weight:800}
+h3{font-size:1.15rem;font-weight:800}
+p,ul,ol{margin:0}
+ul,ol{padding-left:1.3rem;display:flex;flex-direction:column;gap:.35rem}
+a{color:var(--azul)}
+a:focus-visible{outline:3px solid var(--amarillo);outline-offset:2px}
+.suave{color:var(--suave)}
+.volver{display:inline-flex;align-items:center;gap:.4rem;font-weight:800;text-decoration:none;color:var(--tinta);
+  background:var(--hoja);border-radius:999px;padding:.5rem 1rem;box-shadow:0 0 0 2px var(--linea) inset;align-self:flex-start}
+.cabecera{display:flex;flex-direction:column;gap:.8rem}
+.cabecera .lead{font-size:1.12rem;color:var(--suave);max-width:60ch}
+.indice{display:flex;flex-wrap:wrap;gap:.45rem}
+.indice a{text-decoration:none;font-weight:800;font-size:.92rem;color:var(--tinta);background:var(--hoja);border-radius:999px;
+  padding:.35rem .8rem;box-shadow:0 0 0 2px var(--linea) inset}
+.antes{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+@media (max-width:700px){.antes{grid-template-columns:1fr}}
+.antes div{background:var(--hoja);border-radius:16px;box-shadow:0 0 0 2px var(--linea) inset;padding:1rem;display:flex;flex-direction:column;gap:.3rem}
+.antes b{font-family:var(--titulo);font-size:1.1rem}
+section{display:flex;flex-direction:column;gap:1rem;scroll-margin-top:1rem}
+.paso{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:1.4rem;align-items:start}
+.paso.sin-foto{grid-template-columns:1fr}
+@media (max-width:700px){.paso{grid-template-columns:1fr}}
+.paso > div{display:flex;flex-direction:column;gap:.8rem;min-width:0}
+.num{display:inline-grid;place-items:center;width:2.2rem;height:2.2rem;border-radius:50%;background:var(--naranja);color:#fff;
+  font-family:var(--titulo);font-weight:800;font-size:1.2rem;flex:none}
+.titulo-paso{display:flex;align-items:center;gap:.7rem}
+figure{margin:0;display:flex;flex-direction:column;gap:.4rem;align-items:center}
+.celular{width:100%;max-width:260px;border-radius:26px;border:7px solid var(--tinta);background:var(--tinta);overflow:hidden;display:block}
+.celular img{width:100%;display:block;border-radius:18px}
+figcaption{font-size:.85rem;color:var(--suave);text-align:center}
+.consejo{background:#fff4d6;border-radius:14px;padding:.8rem 1rem}
+.ojo{background:#fde8e5;border-radius:14px;padding:.8rem 1rem}
+.colores{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.95rem}
+.colores span::before{content:"";display:inline-block;width:.85rem;height:.85rem;border-radius:50%;margin-right:.35rem;vertical-align:-1px;background:var(--c)}
+.dos-col{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+@media (max-width:700px){.dos-col{grid-template-columns:1fr}}
+.dos-col > div{background:var(--hoja);border-radius:16px;box-shadow:0 0 0 2px var(--linea) inset;padding:1rem;display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.tabla{overflow-x:auto;background:var(--hoja);border-radius:16px;box-shadow:0 0 0 2px var(--linea) inset}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:.95rem}
+th,td{text-align:left;padding:.65rem .9rem;border-bottom:1px solid var(--linea);vertical-align:top}
+th{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+tr:last-child td{border-bottom:0}
+kbd{font-family:var(--texto);font-weight:800;background:var(--hoja);border-radius:6px;padding:0 .35rem;box-shadow:0 0 0 1.5px var(--linea) inset;white-space:nowrap}
+</style>
+<!-- FIN-ESTILO -->
+</head>
+<body>
+<!-- INICIO-CUERPO -->
+<main class="hoja">
+  <header class="cabecera">
+    <a class="volver" href="/" id="volver">← Volver a Dibujos Mágicos</a>
+    <h1>Dibujos Mágicos desde el celular</h1>
+    <p class="lead">Todo se puede hacer desde el teléfono: tomar la foto, acomodar el dibujo, elegir cómo baila y con qué canción, armar fiestas y descargar los videos. La computadora solo tiene que estar prendida.</p>
+    <nav class="indice" aria-label="Contenido">
+      <a href="#abrir">Abrir</a><a href="#subir">1 · Subir</a><a href="#puntos">2 · Puntos</a><a href="#recorte">3 · Recorte</a>
+      <a href="#animar">4 · Animar</a><a href="#videos">5 · Videos</a><a href="#fiesta">6 · Fiesta</a><a href="#tele">7 · Tele</a><a href="#compu">¿Compu prendida?</a><a href="#problemas">Problemas</a>
+    </nav>
+  </header>
+
+  <section>
+    <h2>Antes de empezar</h2>
+    <div class="antes">
+      <div><b>💻 Compu prendida</b><span class="suave">Con Docker Desktop abierto. Dibujos Mágicos arranca solo con él.</span></div>
+      <div><b>📶 Mismo WiFi</b><span class="suave">El celular tiene que estar en el WiFi de la casa, no con datos móviles.</span></div>
+      <div><b>🖍️ El dibujo a mano</b><span class="suave">En papel blanco, con buena luz. Los trazos gruesos (crayola, marcador) salen mejor.</span></div>
+    </div>
+  </section>
+
+  <section id="abrir">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">0</span><h2>Abrirlo en el celular</h2></div>
+        <ol>
+          <li>En la computadora, abran Dibujos Mágicos. En la página principal hay un <b>código QR</b>.</li>
+          <li>Apunten la cámara del celular al código y toquen el enlace que aparece.</li>
+          <li>Se abre la misma página en el teléfono.</li>
+        </ol>
+        <div class="dos-col">
+          <div><h3>iPhone: dejarlo como app</h3><p>En Safari toquen <kbd>Compartir ⬆︎</kbd> → <kbd>Agregar a inicio</kbd>. Queda un ícono con la estrellita en la pantalla del teléfono.</p></div>
+          <div><h3>Android: dejarlo como app</h3><p>En Chrome toquen <kbd>⋮</kbd> → <kbd>Agregar a la pantalla principal</kbd>.</p></div>
+        </div>
+        <p class="suave">Así la próxima vez no hace falta el QR: tocan el ícono y listo, siempre que la compu esté prendida.</p>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/01-inicio.jpg" alt="Página principal en el celular con la galería de dibujos" loading="lazy"></span><figcaption>La página principal: galería y botones.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="subir">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">1</span><h2>Subir un dibujo</h2></div>
+        <ol>
+          <li>Toquen <b>＋ Nuevo dibujo</b>.</li>
+          <li>Toquen el recuadro de la cámara. El teléfono pregunta si quieren <b>tomar una foto</b> o <b>elegir una de la galería</b>; sirve cualquiera, incluso una foto que les mandaron por WhatsApp.</li>
+          <li>Escriban el <b>nombre del personaje</b> (“El perrito feliz”) y <b>quién lo dibujó</b>. El nombre de la artista se recuerda para la próxima.</li>
+          <li>Toquen <b>✨ Darle vida</b>. En unos segundos la IA encuentra el dibujo en la foto.</li>
+        </ol>
+        <div class="consejo"><b>Para una buena foto:</b> desde arriba, de frente, con el dibujo llenando casi toda la pantalla y sin la sombra del teléfono encima.</div>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/02-nuevo.jpg" alt="Pantalla de nuevo dibujo con la foto y los nombres" loading="lazy"></span><figcaption>Foto, nombre y artista.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="puntos">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">2</span><h2>Revisar los puntos del cuerpo</h2></div>
+        <p>La IA pone puntos en la cabeza, el cuerpo, los brazos y las piernas. Si alguno quedó mal, <b>arrástrenlo con el dedo</b> a su lugar y toquen <b>Guardar cambios</b>.</p>
+        <div class="colores">
+          <span style="--c:#2fb27a">Cabeza, pecho y cadera</span>
+          <span style="--c:#ff8a3d">Brazo y pierna de un lado</span>
+          <span style="--c:#3a6fe0">Brazo y pierna del otro</span>
+        </div>
+        <p>En cada lado van, en orden: <b>hombro → codo → mano</b> y <b>cadera → rodilla → pie</b>. Lo importante es que todos los naranjas queden en un mismo lado y todos los azules en el otro.</p>
+        <div class="consejo">Si el dibujo es un garabato sin brazos ni piernas (los de la bebé), la app lo nota sola y deja listo el modo <b>gelatina</b>. En ese caso los puntos no importan: pueden saltarse este paso.</div>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/03-puntos.jpg" alt="Editor con los puntos de colores sobre el dibujo" loading="lazy"></span><figcaption>Arrastrar con el dedo.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="recorte">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">3</span><h2>Arreglar el recorte (si hace falta)</h2></div>
+        <p>En la pestaña <b>2 · Recorte</b>, lo que se ve <b>gris</b> es papel y no se va a mover. Casi siempre está bien y no hay que tocar nada.</p>
+        <ul>
+          <li><b>🖌️ Agregar:</b> pinten con el dedo las partes del dibujo que quedaron grises.</li>
+          <li><b>🧽 Quitar:</b> borren lo que no es dibujo (una sombra, el borde de la mesa).</li>
+          <li><b>Tamaño</b> cambia el grosor del pincel y <b>↶ Deshacer</b> devuelve el último trazo.</li>
+        </ul>
+        <p>Al terminar, toquen <b>Guardar cambios</b>.</p>
+        <div class="consejo">Si la app avisa que el recorte tiene <b>partes sueltas</b>, con brazos y piernas solo se mueve la más grande. Únanlas pintando una rayita entre ellas, o usen gelatina.</div>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/04-recorte.jpg" alt="Pestaña de recorte con el papel en gris y los pinceles" loading="lazy"></span><figcaption>Gris = papel.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="animar">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">4</span><h2>Animar: movimiento, fondo y canción</h2></div>
+        <p>Bajen hasta <b>¡A animar!</b> y elijan:</p>
+        <ul>
+          <li><b>El tipo:</b> <i>Con brazos y piernas</i> (bailar, saludar, saltar, brincos tijera, dab) o <i>Gelatina</i> (rebotar, bambolear, flotar, menearse), que funciona con cualquier dibujo.</li>
+          <li><b>El fondo:</b> parque, playa, noche de estrellas, fondo del mar, espacio o papel blanco.</li>
+          <li><b>La canción:</b> cada movimiento trae una sugerida. <b>Toquen una canción para escucharla</b>, y tóquenla otra vez para pararla.</li>
+        </ul>
+        <p>Toquen <b>✨ Crear animación</b>. Sale una barra que avanza: tarda entre 10 segundos y un minuto.</p>
+        <div class="consejo">Pueden bloquear el teléfono o irse a otra página mientras tanto: el video se sigue haciendo en la compu y aparece cuando vuelvan.</div>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/05-animar.jpg" alt="Panel para elegir movimiento, fondo y música" loading="lazy"></span><figcaption>Movimiento, fondo y canción.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="videos">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">5</span><h2>Ver, descargar y compartir</h2></div>
+        <p>El video aparece en <b>Videos</b>, debajo. Tóquenlo para verlo con música.</p>
+        <div class="dos-col">
+          <div><h3>iPhone</h3><p>Toquen <b>⬇ Descargar</b> → <b>Descargar</b>. Queda en la app <b>Archivos</b> (carpeta Descargas). Desde ahí: <kbd>Compartir ⬆︎</kbd> → WhatsApp, o <b>Guardar video</b> para que pase a Fotos.</p></div>
+          <div><h3>Android</h3><p>Toquen <b>⬇ Descargar</b>. Queda en <b>Descargas</b> y aparece en la galería. Desde ahí se comparte por WhatsApp como cualquier video.</p></div>
+        </div>
+        <p class="suave">Con <b>✏️ Cambiar nombre</b> se corrige el nombre o la artista, y con <b>Borrar</b> se quitan videos o dibujos (pide confirmación).</p>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/06-video.jpg" alt="Video terminado con botones de descargar y borrar" loading="lazy"></span><figcaption>El video listo.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="fiesta">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">6</span><h2>Fiesta: varios bailando juntos</h2></div>
+        <ol>
+          <li>En la página principal toquen <b>🎉 Fiesta</b>.</li>
+          <li>Toquen de <b>2 a 5 dibujos</b> en el orden en que van a salir, de izquierda a derecha. A cada uno le aparece su número.</li>
+          <li>Debajo de cada elegido hay una etiqueta: tóquenla para cambiar entre <b>🕺 Brazos y piernas</b> y <b>🍮 Gelatina</b>. Así el garabato de la bebé baila con los dibujos de su hermana.</li>
+          <li>Elijan el baile, el fondo y la canción, y toquen <b>🎉 Crear fiesta</b>.</li>
+        </ol>
+        <p class="suave">Las fiestas tardan un poco más (hasta un par de minutos) y quedan abajo, en <b>Fiestas</b>, para ver o descargar.</p>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/07-fiesta.jpg" alt="Pantalla de fiesta con tres dibujos elegidos y numerados" loading="lazy"></span><figcaption>Tres invitados, en orden.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="tele">
+    <div class="paso">
+      <div>
+        <div class="titulo-paso"><span class="num">7</span><h2>Verlo en la tele</h2></div>
+        <p>El <b>▶ Modo función</b> pasa todos los videos y fiestas uno tras otro, con música, y antes de cada uno muestra el nombre del personaje y de la artista. Se ve donde lo abran:</p>
+        <ul>
+          <li><b>En la tele, con la compu conectada por HDMI:</b> ábranlo en la compu. Es lo más sencillo.</li>
+          <li><b>En una Smart TV:</b> en el navegador de la tele escriban la dirección del QR agregando <code>/funcion</code>.</li>
+          <li><b>Desde el celular:</b> si tienen Chromecast, Google TV o AirPlay, pueden <b>duplicar la pantalla</b> del teléfono a la tele y abrir el modo función en el celular.</li>
+        </ul>
+        <p>En la pantalla de inicio de la función pueden apagar la música. Toquen <b>▶ Empezar</b>; para pasar de video, toquen la pantalla y usen ⏮ ⏭.</p>
+      </div>
+      <figure><span class="celular"><img src="/static/ayuda/08-funcion.jpg" alt="Inicio del modo función" loading="lazy"></span><figcaption>¡Comienza la función!</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="compu">
+    <h2>¿Hace falta la compu prendida?</h2>
+    <p>Sí. La computadora es la que tiene la IA y la que hace los videos; el celular es como un control remoto.</p>
+    <div class="dos-col">
+      <div><h3>💻 Necesita la compu</h3><ul><li>Subir dibujos y acomodarlos.</li><li>Crear videos y fiestas.</li><li>Ver la galería y el modo función.</li></ul></div>
+      <div><h3>📱 Funciona sin la compu</h3><ul><li>Los videos que ya <b>descargaron</b> al teléfono: se ven y se comparten como cualquier video.</li></ul></div>
+    </div>
+    <div class="consejo"><b>Para que esté lista cuando la necesiten:</b>
+      <ul>
+        <li>En Docker Desktop: <kbd>Settings</kbd> → <kbd>General</kbd> → <b>Start Docker Desktop when you sign in</b>. Así, al prender la compu, Dibujos Mágicos arranca solo.</li>
+        <li>En Windows: <kbd>Configuración</kbd> → <kbd>Sistema</kbd> → <kbd>Energía</kbd>. Pongan que tarde más en suspenderse. Si la compu está suspendida, el celular no la encuentra.</li>
+        <li>Un buen hábito: al terminar, descarguen al celular los videos favoritos.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="problemas">
+    <h2>Si algo no funciona</h2>
+    <div class="tabla"><table>
+      <thead><tr><th>Qué pasa</th><th>Qué hacer</th></tr></thead>
+      <tbody>
+        <tr><td>El celular no abre la página</td><td>Revisen que el teléfono esté en el WiFi de la casa y que la compu esté prendida con Docker Desktop abierto. Si nunca ha abierto, falta el permiso del firewall de Windows (está en las instrucciones de instalación).</td></tr>
+        <tr><td>“La magia se está despertando”</td><td>La IA tarda uno o dos minutos en arrancar cuando se prende la compu. Pueden subir dibujos igual: se preparan apenas esté lista.</td></tr>
+        <tr><td>El video no suena</td><td>En iPhone, revisen el interruptor de silencio del costado y el volumen. Algunos navegadores empiezan el video sin sonido: toquen el ícono del parlante.</td></tr>
+        <tr><td>No aparece la opción de cámara</td><td>Den permiso a la cámara para el navegador (Ajustes del teléfono → Safari o Chrome → Cámara), o tomen la foto antes y elíjanla de la galería.</td></tr>
+        <tr><td>El personaje se mueve raro</td><td>Revisen los puntos: los naranjas en un lado y los azules en el otro, y la cabeza arriba de los hombros.</td></tr>
+        <tr><td>Solo se mueve un pedazo del dibujo</td><td>El recorte quedó en partes: únanlas con 🖌️ en Recorte, o usen un movimiento gelatina.</td></tr>
+        <tr><td>Un garabato quedó con el fondo de la mesa</td><td>En Recorte, borren con 🧽 lo que no es dibujo. La próxima vez, tomen la foto más de cerca.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="suave">Todo se guarda solo en la computadora de la casa. Las fotos de los dibujos no se suben a internet.</p>
+  </section>
+</main>
+<!-- FIN-CUERPO -->
+</body>
+</html>
