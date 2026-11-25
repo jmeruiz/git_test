@@ -14,6 +14,7 @@ function el(etiqueta, attrs = {}, ...hijos) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") e.className = v;
     else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k.startsWith("aria-")) e.setAttribute(k, String(v));
     else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
   }
   for (const h of hijos.flat()) if (h != null) e.append(h.nodeType ? h : document.createTextNode(h));

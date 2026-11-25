@@ -27,12 +27,15 @@ body:hover .controles,.controles:focus-within{opacity:1}
 </head>
 <body>
 <div class="escena">
-  <video id="video" muted playsinline></video>
+  <video id="video" playsinline></video>
   <div class="titulo fuera" id="titulo"><h2 id="tNombre"></h2><p id="tArtista"></p></div>
   <div class="portada" id="portada">
     <img src="/static/logo.svg" width="110" height="110" alt="">
     <h1>¡Comienza la función!</h1>
     <p id="cuantos">Buscando videos…</p>
+    <label style="display:flex;gap:.5rem;align-items:center;font-size:1.2rem;color:#d8d3f5;cursor:pointer">
+      <input type="checkbox" id="sonido" checked style="width:1.3rem;height:1.3rem"> 🔊 Con música
+    </label>
     <button class="boton naranja grande" id="empezar" type="button" disabled>▶ Empezar</button>
     <a href="/" style="color:#d8d3f5">← Volver a la galería</a>
   </div>
@@ -59,11 +62,15 @@ function mostrar(n) {
   const v = lista[i];
   clearTimeout(temporizador);
   document.getElementById("tNombre").textContent = v.nombre;
-  document.getElementById("tArtista").textContent = v.artista ? "por " + v.artista : "";
+  document.getElementById("tArtista").textContent = v.invitados ? "con " + juntar(v.invitados)
+    : v.artista ? "por " + v.artista : "";
   titulo.classList.remove("fuera");
   video.src = v.url;
   video.load();
   temporizador = setTimeout(() => { titulo.classList.add("fuera"); video.play().catch(() => {}); }, 2600);
+}
+function juntar(nombres) {
+  return nombres.length > 1 ? nombres.slice(0, -1).join(", ") + " y " + nombres[nombres.length - 1] : nombres[0] || "";
 }
 let vueltas = 0;
 video.addEventListener("ended", async () => {
@@ -74,6 +81,7 @@ video.addEventListener("ended", async () => {
   mostrar(i + 1);
 });
 document.getElementById("empezar").addEventListener("click", () => {
+  video.muted = !document.getElementById("sonido").checked;
   document.documentElement.requestFullscreen?.().catch(() => {});
   document.getElementById("portada").remove();
   mostrar(0);

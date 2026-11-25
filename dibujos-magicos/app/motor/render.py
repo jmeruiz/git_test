@@ -1,14 +1,23 @@
 """
-Paso 2: del personaje a un video.
+Paso 2: de uno o varios personajes a un video con música.
 
-Se ejecuta como proceso aparte:  python -m motor.render trabajo.json
-El JSON trae: modo ("esqueleto" o "gelatina"), movimiento, fondo, carpeta del personaje, salida.
+Se ejecuta como proceso aparte:  python -m motor.render escena.json
+La escena trae:
+  {"fondo": "parque", "musica": "fiesta" | "ninguna",
+   "personajes": [{"carpeta": "...", "modo": "esqueleto" | "gelatina", "movimiento": "bailar"}, ...],
+   "salida": ".../video.mp4", "miniatura": ".../mini.jpg"}
+
+Cómo se arma cada cuadro:
+  1. Los personajes "con esqueleto" los anima Animated Drawings (todos juntos, sobre el fondo).
+     Si no hay ninguno, la base es solo el fondo.
+  2. Encima se pegan los personajes "gelatina", moviéndose al ritmo de la música.
+  3. Se le pone la música y se guarda en MP4 H.264 (se ve en navegador, celular y tele).
 Imprime "PROGRESO <0-100>" para que el servidor muestre la barra de avance.
 """
 import json
 import math
 import os
-import shutil
+import re
 import subprocess
 import sys
 import tempfile
@@ -18,21 +27,14 @@ import cv2
 import numpy as np
 import yaml
 
-from motor import catalogo
+from motor import catalogo, musica
 
 ANCHO, ALTO, FPS = 1280, 720, 30
+SEGUNDOS_MINIMOS = 7.5
 
 
 def progreso(p):
     print(f"PROGRESO {int(p)}", flush=True)
-
-
-def a_mp4_navegador(entrada, salida, fps_salida=FPS):
-    """Convierte a H.264 (se ve en cualquier navegador, celular o tele)."""
-    subprocess.run([
-        "ffmpeg", "-v", "error", "-y", "-i", str(entrada),
-        "-vf", f"fps={fps_salida},format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
-        "-crf", "20", "-movflags", "+faststart", str(salida)], check=True)
 
 
 def miniatura(video, salida):
@@ -40,7 +42,13 @@ def miniatura(video, salida):
                     "-frames:v", "1", "-vf", "scale=640:-2", str(salida)], check=True)
 
 
-# ---------------------------------------------------------------- esqueleto (Meta)
+def duracion(video):
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
+                       capture_output=True, text=True, check=True)
+    return float(r.stdout.strip())
+
+
+# ---------------------------------------------------------------- cámara y lugares
 
 def camara(posicion, mira_a):
     """Cámara en `posicion` mirando al punto `mira_a` (Animated Drawings usa posición − punto)."""
@@ -49,49 +57,117 @@ def camara(posicion, mira_a):
 
 # Encuadres probados con 1280x720 para que los pies queden cerca del suelo de los fondos.
 CAMARA_NORMAL = camara([0.0, 0.70, 1.75], [0.0, 0.41, 0.0])
-CAMARAS = {
-    # al saltar el personaje avanza hacia la derecha: cámara más lejos y centrada en el recorrido
-    "saltar": camara([0.42, 0.72, 2.3], [0.42, 0.38, 0.0]),
-}
+CAMARA_SALTAR = camara([0.42, 0.72, 2.3], [0.42, 0.38, 0.0])  # al saltar avanza hacia la derecha
+
+# Dónde se para cada personaje (fracción del ancho) y qué tan lejos va la cámara, según cuántos son.
+LUGARES = {1: [.5], 2: [.32, .68], 3: [.2, .5, .8], 4: [.14, .38, .62, .86], 5: [.11, .3, .5, .7, .89]}
+DISTANCIA = {1: 1.75, 2: 2.1, 3: 2.6, 4: 3.1, 5: 3.5}
+SUELO_FIESTA = 0.86          # a qué altura de la pantalla quedan los pies en una fiesta
+ALTO_PERSONAJE_MUNDO = 0.64  # altura típica de un personaje animado, medida en sus videos
+PIES_Y = -0.28               # Animated Drawings deja los pies un poco debajo de y=0 (medido)
+TAN_MEDIO_FOV = math.tan(math.radians(17.5))  # Animated Drawings usa 35° de campo vertical
 
 
-def render_esqueleto(t):
+def camara_escena(n, mov_id, z_personaje=-0.5):
+    if n == 1:
+        return CAMARA_SALTAR if mov_id == "saltar" else CAMARA_NORMAL
+    # Cámara calculada para que los pies queden a SUELO_FIESTA de la pantalla.
+    dz = DISTANCIA[n] - z_personaje
+    cy = PIES_Y + 0.435 * dz  # misma inclinación hacia los pies que en los videos de un personaje
+    abajo = math.atan((SUELO_FIESTA - 0.5) * 2 * TAN_MEDIO_FOV)   # ángulo del suelo bajo el centro
+    inclinacion = math.atan((cy - PIES_Y) / dz) - abajo
+    ty = cy - dz * math.tan(inclinacion)
+    cx = 0.42 if mov_id == "saltar" else 0.0
+    return camara([cx, cy, DISTANCIA[n]], [cx, ty, z_personaje])
+
+
+def x_mundo(fraccion, cam, z_personaje):
+    """Convierte 'fracción del ancho de la pantalla' a la coordenada x del mundo 3D."""
+    cx, cz = cam["CAMERA_POS"][0], cam["CAMERA_POS"][2]
+    ancho_mundo = 2 * (cz - z_personaje) * TAN_MEDIO_FOV * ANCHO / ALTO
+    return cx + (fraccion - 0.5) * ancho_mundo
+
+
+def retarget_movido(ruta, x, carpeta_tmp, i):
+    """Copia el archivo de retarget cambiando solo la x de donde arranca el personaje."""
+    texto = Path(ruta).read_text()
+    m = re.search(r"^char_starting_location:\s*\[([^\]]*)\]", texto, re.M)
+    y, z = (float(v) for v in m.group(1).split(",")[1:3])
+    texto = texto[:m.start()] + f"char_starting_location: [{x:.4f}, {y}, {z}]" + texto[m.end():]
+    nueva = Path(carpeta_tmp) / f"retarget_{i}.yaml"
+    nueva.write_text(texto)
+    return str(nueva), z
+
+
+def z_inicial(ruta):
+    m = re.search(r"^char_starting_location:\s*\[([^\]]*)\]", Path(ruta).read_text(), re.M)
+    return float(m.group(1).split(",")[2])
+
+
+# ---------------------------------------------------------------- esqueleto (Animated Drawings de Meta)
+
+def render_esqueletos(personajes, fondo, n_total, tmp):
+    """Anima con Animated Drawings a los personajes con esqueleto. Devuelve la ruta del video crudo."""
     from animated_drawings import render as ad_render  # importa OpenGL, solo aquí
 
-    _, mov = catalogo.movimiento(t["movimiento"])
-    carpeta = Path(t["carpeta"]).resolve()
-    with tempfile.TemporaryDirectory() as tmp:
-        crudo = Path(tmp) / "crudo.mp4"
-        vista = {"USE_MESA": True, "WINDOW_DIMENSIONS": [ANCHO, ALTO],
-                 "BACKGROUND_IMAGE": catalogo.ruta_fondo(t["fondo"])}
-        vista.update(t.get("camara") or CAMARAS.get(mov["id"], CAMARA_NORMAL))
-        cfg = {
-            "scene": {"ANIMATED_CHARACTERS": [{
-                "character_cfg": str(carpeta / "char_cfg.yaml"),
-                "motion_cfg": catalogo.motion_cfg(mov),
-                "retarget_cfg": catalogo.retarget_cfg(mov),
-            }]},
-            "view": vista,
-            "controller": {"MODE": "video_render", "OUTPUT_VIDEO_PATH": str(crudo), "OUTPUT_VIDEO_CODEC": "mp4v"},
-        }
-        ruta_cfg = Path(tmp) / "mvc.yaml"
-        ruta_cfg.write_text(yaml.dump(cfg))
+    mov_id = personajes[0]["movimiento"]
+    _, mov = catalogo.movimiento(mov_id)
+    cam = camara_escena(n_total, mov_id, z_inicial(catalogo.retarget_cfg(mov)))
+    lista = []
+    for i, p in enumerate(personajes):
+        retarget = catalogo.retarget_cfg(mov)
+        if n_total > 1:
+            x = x_mundo(p["lugar"], cam, z_inicial(retarget))
+            retarget, _ = retarget_movido(retarget, x, tmp, i)
+        lista.append({"character_cfg": str(Path(p["carpeta"]).resolve() / "char_cfg.yaml"),
+                      "motion_cfg": catalogo.motion_cfg(mov), "retarget_cfg": retarget})
 
-        # Animated Drawings muestra su avance con tqdm; lo traducimos a PROGRESO.
-        import tqdm as tqdm_mod
-        original = tqdm_mod.tqdm.update
+    crudo = Path(tmp) / "esqueletos.mp4"
+    vista = {"USE_MESA": True, "WINDOW_DIMENSIONS": [ANCHO, ALTO], "BACKGROUND_IMAGE": catalogo.ruta_fondo(fondo)}
+    vista.update(cam)
+    cfg = {"scene": {"ANIMATED_CHARACTERS": lista}, "view": vista,
+           "controller": {"MODE": "video_render", "OUTPUT_VIDEO_PATH": str(crudo), "OUTPUT_VIDEO_CODEC": "mp4v"}}
+    ruta_cfg = Path(tmp) / "mvc.yaml"
+    ruta_cfg.write_text(yaml.dump(cfg))
 
-        def update(self, n=1):
-            r = original(self, n)
-            if self.total:
-                progreso(5 + 85 * self.n / self.total)
-            return r
-        tqdm_mod.tqdm.update = update
+    # Animated Drawings muestra su avance con tqdm; lo traducimos a PROGRESO.
+    import tqdm as tqdm_mod
+    original = tqdm_mod.tqdm.update
 
-        os.chdir(catalogo.AD_ROOT)
+    def update(self, n=1):
+        r = original(self, n)
+        if self.total:
+            progreso(5 + 50 * self.n / self.total)
+        return r
+    tqdm_mod.tqdm.update = update
+
+    antes = os.getcwd()
+    os.chdir(catalogo.AD_ROOT)
+    try:
         ad_render.start(str(ruta_cfg))
-        progreso(92)
-        a_mp4_navegador(crudo, t["salida"])
+    finally:
+        os.chdir(antes)
+    return crudo
+
+
+def cuadros_base(crudo, fondo_img, total, vueltas):
+    """Da `total` cuadros BGR: los del video de Animated Drawings (repetido) o el fondo quieto."""
+    if crudo is None:
+        for _ in range(total):
+            yield fondo_img.copy()
+        return
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-stream_loop", str(vueltas - 1), "-i", str(crudo),
+                          "-vf", f"fps={FPS},scale={ANCHO}:{ALTO}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
+                         stdout=subprocess.PIPE)
+    tam = ANCHO * ALTO * 3
+    ultimo = fondo_img
+    for _ in range(total):
+        datos = p.stdout.read(tam)
+        if len(datos) == tam:
+            ultimo = np.frombuffer(datos, np.uint8).reshape(ALTO, ANCHO, 3).copy()
+        yield ultimo.copy()
+    p.stdout.close()
+    p.wait()
 
 
 # ---------------------------------------------------------------- gelatina (propio)
@@ -175,77 +251,120 @@ def chispitas(fondo, t, n=14, semilla=7):
         cv2.line(fondo, (int(x), int(y - r)), (int(x), int(y + r)), color, 2, cv2.LINE_AA)
 
 
-def render_gelatina(t):
-    mov = t["movimiento"]
-    pj = recorte_rgba(t["carpeta"])
-    ph, pw = pj.shape[:2]
-    escala = min(0.58 * ALTO / ph, 0.42 * ANCHO / pw)
-    pj = cv2.resize(pj, (max(2, int(pw * escala)), max(2, int(ph * escala))), interpolation=cv2.INTER_AREA)
-    ph, pw = pj.shape[:2]
+class Gelatina:
+    """Un personaje gelatina: su recorte, su lugar y cómo se mueve al ritmo (pulsos por minuto)."""
 
-    fondo = cv2.resize(cv2.imread(catalogo.ruta_fondo(t["fondo"])), (ANCHO, ALTO))
-    suelo = int(ALTO * 0.88)
-    segundos = 8
-    total = segundos * FPS
+    def __init__(self, carpeta, movimiento, lugar, n_total, bpm):
+        self.mov = movimiento
+        self.pulso = 60.0 / bpm
+        pj = recorte_rgba(carpeta)
+        ph, pw = pj.shape[:2]
+        if n_total == 1:
+            alto_max, ancho_max, self.suelo = 0.58 * ALTO, 0.42 * ANCHO, 0.88 * ALTO
+            self.amplitud = 0.14 * ANCHO
+        else:
+            # más o menos del tamaño de los personajes con esqueleto a esa distancia de cámara
+            dz = DISTANCIA[n_total] + 0.5
+            alto_max = 0.9 * ALTO_PERSONAJE_MUNDO / (2 * dz * TAN_MEDIO_FOV) * ALTO
+            separacion = (LUGARES[n_total][1] - LUGARES[n_total][0]) * ANCHO
+            ancho_max, self.suelo = 0.75 * separacion, SUELO_FIESTA * ALTO
+            self.amplitud = 0.25 * separacion
+        escala = min(alto_max / ph, ancho_max / pw)
+        self.img = cv2.resize(pj, (max(2, int(pw * escala)), max(2, int(ph * escala))), interpolation=cv2.INTER_AREA)
+        self.cx = lugar * ANCHO
+
+    def dibujar(self, cuadro, s):
+        ph, pw = self.img.shape[:2]
+        b = s / self.pulso  # cuántos pulsos de música van
+        cx, base, sx, sy, ang, onda = self.cx, self.suelo, 1.0, 1.0, 0.0, 0.0
+        if self.mov == "rebotar":
+            fase = (b % 2) / 2
+            altura = math.sin(math.pi * fase)
+            base = self.suelo - 0.32 * ph * altura
+            aplasta = max(0.0, 1 - altura / 0.22)
+            sy, sx = 1 - 0.16 * aplasta + 0.06 * altura, 1 + 0.12 * aplasta - 0.03 * altura
+            sombra(cuadro, cx, self.suelo, pw * (0.9 - 0.35 * altura), 0.35 - 0.15 * altura)
+        elif self.mov == "bambolear":
+            onda = 0.16 * pw * math.sin(math.pi * b)
+            sy = 1 + 0.04 * math.sin(2 * math.pi * b)
+            sx = 2 - sy
+            sombra(cuadro, cx, self.suelo, pw * 0.9, 0.3)
+        elif self.mov == "flotar":
+            base = self.suelo - 0.2 * ph - 0.08 * ph * math.sin(2 * math.pi * b / 8)
+            ang = 7 * math.sin(2 * math.pi * b / 6)
+            cx = self.cx + 0.35 * self.amplitud * math.sin(2 * math.pi * b / 12)
+            sombra(cuadro, cx, self.suelo, pw * 0.6, 0.18)
+        else:  # menear
+            lado = math.sin(math.pi * b)
+            cx = self.cx + self.amplitud * lado
+            ang = -13 * lado
+            salto = abs(math.sin(math.pi * b))
+            base = self.suelo - 0.08 * ph * salto
+            onda = 0.06 * pw * math.sin(math.pi * b + 1)
+            sombra(cuadro, cx, self.suelo, pw * 0.85, 0.3 - 0.1 * salto)
+        img, pivote = transformar(self.img, sx, sy, ang, onda)
+        pegar(cuadro, img, cx, base, pivote)
+
+
+# ---------------------------------------------------------------- escena completa
+
+def render(escena):
+    pjs = escena["personajes"]
+    n = len(pjs)
+    for p, lugar in zip(pjs, LUGARES[n]):
+        p["lugar"] = lugar
+    cancion = escena.get("musica")
+    if cancion not in musica.CANCIONES:
+        cancion = None
+    fondo_img = cv2.resize(cv2.imread(catalogo.ruta_fondo(escena["fondo"])), (ANCHO, ALTO))
+    esqueletos = [p for p in pjs if p["modo"] == "esqueleto"]
+    gelatinas = [p for p in pjs if p["modo"] != "esqueleto"]
 
     with tempfile.TemporaryDirectory() as tmp:
-        crudo = Path(tmp) / "crudo.mp4"
-        ff = subprocess.Popen([
-            "ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{ANCHO}x{ALTO}",
-            "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(crudo)], stdin=subprocess.PIPE)
-        for f in range(total):
+        crudo, vueltas = None, 1
+        if esqueletos:
+            crudo = render_esqueletos(esqueletos, escena["fondo"], n, tmp)
+            d = duracion(crudo)
+            vueltas = max(1, math.ceil(SEGUNDOS_MINIMOS / d))  # los movimientos cortos se repiten
+            segundos = d * vueltas
+        else:
+            segundos = musica.duracion_en_compases(cancion, 8.0) if cancion else 8.0
+        total = int(round(segundos * FPS))
+        inicio = 55 if esqueletos else 5
+
+        bpm = musica.bpm_de(cancion) if cancion else 116
+        figuras = [Gelatina(p["carpeta"], p["movimiento"], p["lugar"], n, bpm) for p in gelatinas]
+        flota = any(p["movimiento"] == "flotar" for p in gelatinas)
+
+        entrada_audio = []
+        if cancion:
+            wav = Path(tmp) / "musica.wav"
+            musica.escribir_wav(cancion, segundos, wav)
+            entrada_audio = ["-i", str(wav), "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+        ff = subprocess.Popen(
+            ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{ANCHO}x{ALTO}",
+             "-r", str(FPS), "-i", "-"] + entrada_audio +
+            ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+             "-movflags", "+faststart", str(escena["salida"])], stdin=subprocess.PIPE)
+        for f, cuadro in enumerate(cuadros_base(crudo, fondo_img, total, vueltas)):
             s = f / FPS
-            cuadro = fondo.copy()
-            cx, base, sx, sy, ang, onda = ANCHO / 2, suelo, 1.0, 1.0, 0.0, 0.0
-            if mov == "rebotar":
-                T = 0.9
-                fase = (s % T) / T
-                altura = math.sin(math.pi * fase)
-                base = suelo - 0.22 * ALTO * altura
-                aplasta = max(0.0, 1 - altura / 0.22)
-                sy, sx = 1 - 0.16 * aplasta + 0.06 * altura, 1 + 0.12 * aplasta - 0.03 * altura
-                sombra(cuadro, cx, suelo, pw * (0.9 - 0.35 * altura), 0.35 - 0.15 * altura)
-            elif mov == "bambolear":
-                onda = 0.16 * pw * math.sin(2 * math.pi * s / 1.1)
-                sy = 1 + 0.04 * math.sin(2 * math.pi * s / 0.55)
-                sx = 2 - sy
-                sombra(cuadro, cx, suelo, pw * 0.9, 0.3)
-            elif mov == "flotar":
-                base = suelo - 0.12 * ALTO - 0.05 * ALTO * math.sin(2 * math.pi * s / 3.2)
-                ang = 7 * math.sin(2 * math.pi * s / 2.4)
-                cx = ANCHO / 2 + 0.05 * ANCHO * math.sin(2 * math.pi * s / 5.0)
+            if flota:
                 chispitas(cuadro, s)
-                sombra(cuadro, cx, suelo, pw * 0.6, 0.18)
-            elif mov == "menear":
-                T = 1.2
-                lado = math.sin(2 * math.pi * s / T)
-                cx = ANCHO / 2 + 0.14 * ANCHO * lado
-                ang = -13 * lado
-                salto = abs(math.sin(2 * math.pi * s / T * 2))
-                base = suelo - 0.05 * ALTO * salto
-                onda = 0.06 * pw * math.sin(2 * math.pi * s / T + 1)
-                sombra(cuadro, cx, suelo, pw * 0.85, 0.3 - 0.1 * salto)
-            img, pivote = transformar(pj, sx, sy, ang, onda)
-            pegar(cuadro, img, cx, base, pivote)
+            for g in figuras:
+                g.dibujar(cuadro, s)
             ff.stdin.write(cuadro.tobytes())
-            if f % 10 == 0:
-                progreso(5 + 85 * f / total)
+            if f % 15 == 0:
+                progreso(inicio + (95 - inicio) * f / total)
         ff.stdin.close()
         if ff.wait() != 0:
             raise RuntimeError("ffmpeg no pudo crear el video")
-        progreso(92)
-        shutil.move(str(crudo), t["salida"])
 
 
 def main():
-    t = json.loads(Path(sys.argv[1]).read_text())
+    escena = json.loads(Path(sys.argv[1]).read_text())
     progreso(2)
-    if t["modo"] == "esqueleto":
-        render_esqueleto(t)
-    else:
-        render_gelatina(t)
-    miniatura(t["salida"], t["miniatura"])
+    render(escena)
+    miniatura(escena["salida"], escena["miniatura"])
     progreso(100)
 
 

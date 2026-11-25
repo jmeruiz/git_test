@@ -1,12 +1,16 @@
 # Dibujos Mágicos ✨
 
-Una foto de un dibujo de las niñas → un video donde el dibujo **baila, saluda, salta** o **rebota como gelatina**, con fondos de parque, playa, noche, mar o espacio. Después se ven todos en grande en la tele con el **modo función**.
+Una foto de un dibujo de las niñas → un video **con música** donde el dibujo **baila, saluda, salta** o **rebota como gelatina**, con fondos de parque, playa, noche, mar o espacio. Varios dibujos pueden bailar juntos en una **fiesta**. Después se ven todos en grande en la tele con el **modo función**.
 
 Todo corre en su computadora: las fotos y los videos no salen de la casa.
 
 | Con brazos y piernas | Gelatina (cualquier garabato) |
 |---|---|
 | ![La niña del vestido bailando en el parque](docs/ejemplo-bailar.gif) | ![Garabato rebotando en el espacio](docs/ejemplo-rebotar.gif) |
+
+**Fiesta:** varios dibujos juntos, cada uno a su manera y al mismo ritmo.
+
+![Fiesta bajo el mar con tres dibujos](docs/ejemplo-fiesta.gif)
 
 ---
 
@@ -59,21 +63,50 @@ En Mac o Linux, en vez del `.bat`, abran la terminal en la carpeta y escriban `.
 2. En unos segundos la IA recorta el dibujo y adivina dónde están la cabeza, los brazos y las piernas.
 3. **Revisen los puntos**: si alguno quedó mal, arrástrenlo a su lugar (cabeza, pecho, cadera; y en cada lado hombro → codo → mano y cadera → rodilla → pie). Le den a **Guardar cambios**.
 4. Si al recorte le falta un pedazo o le sobra papel, vayan a **2 · Recorte** y usen 🖌️ para agregar o 🧽 para quitar.
-5. Elijan un **movimiento** y un **fondo**, y **✨ Crear animación**. Tarda entre 10 segundos y un minuto.
+5. Elijan un **movimiento**, un **fondo** y una **canción**, y **✨ Crear animación**. Tarda entre 10 segundos y un minuto.
 6. Pueden **descargar** el video para mandarlo a la familia.
 
-### Desde el celular
+### Música
 
-En la página principal aparece un **código QR**. Escanéenlo con la cámara del celular (tiene que estar en el mismo WiFi que la computadora). Así toman la foto del dibujo directo y la suben.
+Cada movimiento trae una canción sugerida, y se puede cambiar (tocar una canción la deja escuchar unos segundos):
+
+| Canción | Para qué va bien |
+|---|---|
+| ⭐ Estrellita | saludar, tranquila |
+| 🌙 Canción de cuna (Brahms) | flotar, para antes de dormir |
+| 🪇 La cucaracha | dab, bambolear |
+| 🎉 Fiesta de colores | bailar, menearse |
+| 🐸 Saltarín | saltar, brincos, rebotar |
+
+Las tres primeras son canciones tradicionales de dominio público y las dos últimas son originales de este proyecto. Todas las toca un sintetizador incluido en el programa (cajita de música, marimba, xilófono), así que no hay problemas de derechos. Los personajes gelatina se mueven al ritmo de la canción. El volumen está pensado para oídos pequeños.
+
+### Fiesta: varios bailando juntos
+
+Botón **🎉 Fiesta** en la página principal:
+
+1. Toquen de 2 a 5 personajes, en el orden en que quieren que salgan (de izquierda a derecha).
+2. Debajo de cada uno se puede cambiar si baila **con brazos y piernas** o como **gelatina**. Así un garabato de la bebé puede bailar junto a los dibujos de su hermana.
+3. Elijan el baile, el fondo y la canción, y **🎉 Crear fiesta**. Los de brazos y piernas hacen todos el mismo baile; los gelatina hacen su versión, al mismo ritmo.
+
+### Desde el celular (no hace falta pasar las fotos a la compu)
+
+En la página principal aparece un **código QR**. Escanéenlo con la cámara del celular (tiene que estar en el mismo WiFi que la computadora). Se abre Dibujos Mágicos en el celular y desde ahí:
+
+- **＋ Nuevo dibujo → Tomar foto**: abre la cámara, toman la foto del dibujo y se sube sola a la computadora.
+- También pueden elegir una foto que ya tengan en el celular (por ejemplo, una que les mandaron por WhatsApp).
+- Todo lo demás (acomodar puntos, animar, ver los videos) también se puede hacer desde el celular.
+
+La computadora solo tiene que estar prendida con Dibujos Mágicos corriendo. Guarde la dirección como favorito en el celular para la próxima vez.
 
 ### En la tele: modo función
 
-Botón **▶ Modo función**. Pasa todos los videos uno tras otro, con el nombre del personaje y de la artista antes de cada uno. Para verlo en la tele:
+Botón **▶ Modo función**. Pasa todos los videos y fiestas uno tras otro, con música y con el nombre del personaje y de la artista antes de cada uno. Hay tres formas de verlo en la tele:
 
-- conecten la computadora a la tele con un cable **HDMI**, o
-- abran la dirección que sale en el QR (por ejemplo `http://192.168.1.50:8000/funcion`) en el navegador de la tele, si es Smart TV.
+1. **Cable HDMI** (la más sencilla y la que mejor funciona): un cable HDMI de la computadora a la tele. En la tele elijan esa entrada HDMI. En Windows, `tecla Windows + P` → **Duplicar** para ver lo mismo en las dos pantallas. Si la compu está lejos de la tele, hay cables HDMI de 5 o 10 metros. El sonido sale por la tele.
+2. **Smart TV**: abran el navegador de la tele y escriban la dirección que sale debajo del QR, agregando `/funcion` (por ejemplo `http://192.168.1.50:8000/funcion`). La tele tiene que estar en el mismo WiFi. Algunos navegadores de tele son lentos o no reproducen video; si pasa, usen otra opción.
+3. **Chromecast o Google TV**: en Chrome de la computadora, menú ⋮ → **Transmitir…** → elijan la tele y **Transmitir pestaña**. Luego abran el modo función.
 
-Con las flechas ← → del teclado se cambia de video.
+En la pantalla de inicio del modo función se puede apagar la música. Con las flechas ← → del teclado se cambia de video.
 
 ### Dos tipos de movimiento
 
@@ -111,13 +144,13 @@ Para ver qué está pasando por dentro: en Docker Desktop → Containers → `di
 - **`modelos/`**: los dos modelos de IA de [Animated Drawings de Meta](https://github.com/facebookresearch/AnimatedDrawings) (licencia MIT), servidos con TorchServe. Uno encuentra el dibujo en la foto y el otro adivina los 17 puntos del cuerpo.
 - **`app/`**: la página web (Flask) y el motor.
   - `motor/anotar.py`: recorta el dibujo del papel, blanquea el papel y arma el esqueleto. Si la IA no encuentra nada, usa la tinta del papel y un esqueleto de plantilla.
-  - `motor/render.py`: crea los videos. Los de brazos y piernas usan Animated Drawings sin pantalla (OSMesa). Los de gelatina son un motor propio con OpenCV. Todo se convierte a MP4 H.264 con ffmpeg.
-  - `static/`: las páginas (galería, nuevo dibujo, editor, modo función).
+  - `motor/render.py`: arma cada video como una escena con uno o varios personajes. Los de brazos y piernas los anima Animated Drawings sin pantalla (OSMesa), todos juntos y cada uno en su lugar. Los de gelatina son un motor propio con OpenCV que se mueve al pulso de la canción. Al final ffmpeg lo junta con la música en MP4 H.264.
+  - `motor/musica.py`: el sintetizador y las canciones.
+  - `static/`: las páginas (galería, nuevo dibujo, editor, fiesta, modo función).
 - Los fondos son ilustraciones generadas con IA para este proyecto.
 
 ### Ideas para después
 
-- Fiesta: varios personajes bailando juntos en el mismo video.
-- Música de fondo en el modo función.
 - Grabar movimientos propios (un baile de papá) con una app que convierta video a BVH.
+- Grabar la voz de las niñas cantando y usarla como música.
 - Que Bubu, el peluche, "vea" los dibujos de las niñas.

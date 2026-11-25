@@ -29,14 +29,17 @@ import cv2
 import numpy as np
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-from motor import catalogo
+from motor import catalogo, musica
 from motor.anotar import (ErrorAnotacion, ajustar_puntos, anotar, guardar_char_cfg, leer_puntos,
                           modelos_listos, validar_puntos)
 
 AQUI = Path(__file__).resolve().parent
 DATOS = Path(os.environ.get("DATOS", AQUI / "datos"))
 PERSONAJES = DATOS / "personajes"
-PERSONAJES.mkdir(parents=True, exist_ok=True)
+FIESTAS = DATOS / "fiestas"
+CACHE = DATOS / "cache"
+for _c in (PERSONAJES, FIESTAS, CACHE):
+    _c.mkdir(parents=True, exist_ok=True)
 DIRECCION_LAN = os.environ.get("DIRECCION_LAN", "").strip()
 PUERTO = int(os.environ.get("PUERTO", "8000"))
 
@@ -115,6 +118,8 @@ def trabajador():
         try:
             if t["tipo"] == "anotar":
                 hacer_anotacion(t)
+            elif t["tipo"] == "fiesta":
+                hacer_fiesta(t)
             else:
                 hacer_video(t)
             t["estado"] = "listo"
@@ -125,6 +130,8 @@ def trabajador():
             t["mensaje"] = str(e) or e.__class__.__name__
             if t["tipo"] == "anotar":
                 actualizar_info(PERSONAJES / t["personaje"], estado="error", mensaje=t["mensaje"])
+            if t["tipo"] == "fiesta":
+                actualizar_info(FIESTAS / t["fiesta"], estado="error", mensaje=t["mensaje"])
         finally:
             t["fin"] = time.time()
             cola.task_done()
@@ -141,15 +148,10 @@ def hacer_anotacion(t):
                     version=info.get("version", 0) + 1, mensaje="")
 
 
-def hacer_video(t):
-    c = PERSONAJES / t["personaje"]
-    (c / "videos").mkdir(exist_ok=True)
-    vid = nuevo_id()
-    archivo, mini = f"{t['movimiento']}-{t['fondo']}-{vid}.mp4", f"{vid}.jpg"
-    trabajo = {"modo": t["modo"], "movimiento": t["movimiento"], "fondo": t["fondo"], "carpeta": str(c),
-               "salida": str(c / "videos" / archivo), "miniatura": str(c / "videos" / mini)}
-    ruta_json = c / f"trabajo-{vid}.json"
-    ruta_json.write_text(json.dumps(trabajo))
+def correr_render(t, escena, carpeta):
+    """Corre motor.render en otro proceso y va actualizando el progreso del trabajo."""
+    ruta_json = carpeta / f"escena-{nuevo_id()}.json"
+    ruta_json.write_text(json.dumps(escena))
     try:
         p = subprocess.Popen([sys.executable, "-m", "motor.render", str(ruta_json)], cwd=str(AQUI),
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -158,22 +160,47 @@ def hacer_video(t):
             m = re.match(r"PROGRESO (\d+)", linea)
             if m:
                 t["progreso"] = int(m.group(1))
-            else:
+            elif "it/s]" not in linea:
                 ultimas = (ultimas + [linea.strip()])[-15:]
         if p.wait(timeout=60 * 30) != 0:
             logging.error("Render falló:\n%s", "\n".join(ultimas))
             raise RuntimeError("No se pudo crear el video. " + pista_error("\n".join(ultimas)))
     finally:
         ruta_json.unlink(missing_ok=True)
+
+
+def hacer_video(t):
+    """Video de un solo personaje."""
+    c = PERSONAJES / t["personaje"]
+    (c / "videos").mkdir(exist_ok=True)
+    vid = nuevo_id()
+    archivo, mini = f"{t['movimiento']}-{t['fondo']}-{vid}.mp4", f"{vid}.jpg"
+    escena = {"fondo": t["fondo"], "musica": t["musica"],
+              "personajes": [{"carpeta": str(c), "modo": t["modo"], "movimiento": t["movimiento"]}],
+              "salida": str(c / "videos" / archivo), "miniatura": str(c / "videos" / mini)}
+    correr_render(t, escena, c)
     _, mov = catalogo.movimiento(t["movimiento"])
     with candado:
         info = leer_info(c)
         info.setdefault("videos", []).insert(0, {
             "id": vid, "archivo": archivo, "miniatura": mini, "movimiento": t["movimiento"],
-            "movimiento_nombre": mov["nombre"], "fondo": t["fondo"], "creado": ahora()})
+            "movimiento_nombre": mov["nombre"], "fondo": t["fondo"], "musica": t["musica"], "creado": ahora()})
         info["estado"] = "listo"
+        info["modo_preferido"] = t["modo"]
         guardar_info(c, info)
     t["video"] = vid
+
+
+def hacer_fiesta(t):
+    """Video con varios personajes juntos."""
+    c = FIESTAS / t["fiesta"]
+    info = leer_info(c)
+    escena = {"fondo": info["fondo"], "musica": info["musica"],
+              "personajes": [{"carpeta": str(PERSONAJES / p["id"]), "modo": p["modo"], "movimiento": p["movimiento"]}
+                             for p in info["personajes"]],
+              "salida": str(c / "fiesta.mp4"), "miniatura": str(c / "fiesta.jpg")}
+    correr_render(t, escena, c)
+    actualizar_info(c, estado="listo", mensaje="")
 
 
 def pista_error(texto):
@@ -182,7 +209,7 @@ def pista_error(texto):
     return "Prueba con otro movimiento o revisa el esqueleto."
 
 
-def encolar(tipo, personaje, **extra):
+def encolar(tipo, personaje=None, **extra):
     tid = nuevo_id()
     trabajos[tid] = dict(id=tid, tipo=tipo, personaje=personaje, estado="en_cola", progreso=0,
                          mensaje="", creado=time.time(), **extra)
@@ -212,6 +239,11 @@ def pagina_funcion():
     return send_from_directory(app.static_folder, "funcion.html")
 
 
+@app.get("/fiesta")
+def pagina_fiesta():
+    return send_from_directory(app.static_folder, "fiesta.html")
+
+
 @app.get("/datos/<path:ruta>")
 def archivos_datos(ruta):
     r = send_from_directory(DATOS, ruta)
@@ -236,7 +268,23 @@ def estado():
 @app.get("/api/catalogo")
 def api_catalogo():
     return jsonify(esqueleto=catalogo.MOVIMIENTOS_ESQUELETO, gelatina=catalogo.MOVIMIENTOS_GELATINA,
-                   fondos=[dict(f, url=f"/static/fondos/{f['id']}.jpg") for f in catalogo.FONDOS])
+                   fondos=[dict(f, url=f"/static/fondos/{f['id']}.jpg") for f in catalogo.FONDOS],
+                   musica=[dict(m, url=f"/api/musica/{m['id']}.wav") for m in musica.LISTA])
+
+
+candado_musica = threading.Lock()
+
+
+@app.get("/api/musica/<cancion>.wav")
+def muestra_musica(cancion):
+    """Diez segunditos de la canción, para escucharla antes de elegirla."""
+    if cancion not in musica.CANCIONES:
+        abort(404)
+    ruta = CACHE / f"muestra-{cancion}.wav"
+    with candado_musica:
+        if not ruta.exists():
+            musica.escribir_wav(cancion, musica.duracion_en_compases(cancion, 9.0), ruta)
+    return send_from_directory(CACHE, ruta.name, mimetype="audio/wav")
 
 
 @app.get("/api/qr.svg")
@@ -375,7 +423,10 @@ def crear_video(pid):
     if not mov:
         return jsonify(error="Ese movimiento no existe."), 400
     fondo = datos.get("fondo") or "papel"
-    t = encolar("video", pid, modo=modo, movimiento=mov["id"], fondo=fondo)
+    cancion = datos.get("musica")
+    if cancion not in musica.CANCIONES:
+        cancion = "ninguna"
+    t = encolar("video", pid, modo=modo, movimiento=mov["id"], fondo=fondo, musica=cancion)
     return jsonify(t), 202
 
 
@@ -407,6 +458,74 @@ def ver_trabajo(tid):
     return jsonify(dict(t, delante=pos))
 
 
+# ------------------------------------------------------------------ fiestas
+
+def publico_fiesta(info):
+    fid = info["id"]
+    d = dict(info)
+    if info.get("estado") == "listo":
+        d["url"] = f"/datos/fiestas/{fid}/fiesta.mp4"
+        d["miniatura_url"] = f"/datos/fiestas/{fid}/fiesta.jpg"
+    d["trabajo"] = next((t["id"] for t in trabajos.values()
+                         if t.get("fiesta") == fid and t["estado"] in ("en_cola", "trabajando")), None)
+    return d
+
+
+@app.get("/api/fiestas")
+def lista_fiestas():
+    res = []
+    for c in FIESTAS.iterdir():
+        try:
+            res.append(publico_fiesta(leer_info(c)))
+        except (OSError, ValueError, KeyError):
+            continue
+    res.sort(key=lambda f: f.get("creado", ""), reverse=True)
+    return jsonify(res)
+
+
+@app.post("/api/fiestas")
+def crear_fiesta():
+    datos = request.get_json(force=True)
+    elegidos = datos.get("personajes") or []
+    if not 2 <= len(elegidos) <= 5:
+        return jsonify(error="Elijan entre 2 y 5 personajes para la fiesta."), 400
+    baile_modo, baile = catalogo.movimiento(datos.get("movimiento"))
+    if not baile:
+        return jsonify(error="Ese baile no existe."), 400
+    personajes = []
+    for e in elegidos:
+        pid = str(e.get("id", ""))
+        if not ID_VALIDO.match(pid) or not (PERSONAJES / pid / "info.json").exists():
+            return jsonify(error="Uno de los personajes ya no existe."), 400
+        info = leer_info(PERSONAJES / pid)
+        if info["estado"] not in ("revisar", "listo"):
+            return jsonify(error=f"{info['nombre']} todavía se está preparando."), 409
+        modo = "esqueleto" if e.get("modo") == "esqueleto" and baile_modo == "esqueleto" else "gelatina"
+        # todos los de esqueleto hacen el mismo baile; los gelatina, su versión de ese baile
+        mov = baile["id"] if modo == "esqueleto" else (baile.get("gelatina") or baile["id"])
+        personajes.append({"id": pid, "nombre": info["nombre"], "artista": info.get("artista", ""),
+                           "modo": modo, "movimiento": mov})
+    cancion = datos.get("musica")
+    if cancion not in musica.CANCIONES:
+        cancion = "ninguna"
+    fid = nuevo_id()
+    c = FIESTAS / fid
+    c.mkdir(parents=True)
+    info = {"id": fid, "personajes": personajes, "movimiento": baile["id"], "movimiento_nombre": baile["nombre"],
+            "fondo": datos.get("fondo") or "parque", "musica": cancion, "creado": ahora(), "estado": "creando"}
+    guardar_info(c, info)
+    t = encolar("fiesta", fiesta=fid)
+    return jsonify(dict(publico_fiesta(info), trabajo=t["id"])), 202
+
+
+@app.delete("/api/fiestas/<fid>")
+def borrar_fiesta(fid):
+    if not ID_VALIDO.match(fid or "") or not (FIESTAS / fid).is_dir():
+        abort(404)
+    shutil.rmtree(FIESTAS / fid)
+    return jsonify(ok=True)
+
+
 @app.get("/api/funcion")
 def lista_funcion():
     """Todos los videos, para el modo función (tele)."""
@@ -421,6 +540,15 @@ def lista_funcion():
         for v in info.get("videos", []):
             res.append({"url": f"/datos/personajes/{info['id']}/videos/{v['archivo']}",
                         "nombre": info["nombre"], "artista": info.get("artista", ""), "creado": v["creado"]})
+    for c in FIESTAS.iterdir():
+        try:
+            f = leer_info(c)
+        except (OSError, ValueError):
+            continue
+        if f.get("estado") == "listo":
+            nombres = [p["nombre"] for p in f["personajes"]]
+            res.append({"url": f"/datos/fiestas/{f['id']}/fiesta.mp4", "nombre": "¡Fiesta!",
+                        "artista": "", "invitados": nombres, "creado": f["creado"]})
     res.sort(key=lambda x: x["creado"], reverse=True)
     return jsonify(res)
 
@@ -434,6 +562,13 @@ def recuperar_pendientes():
             continue
         if info.get("estado") == "procesando":
             encolar("anotar", info["id"])
+    for c in FIESTAS.iterdir():
+        try:
+            info = leer_info(c)
+        except (OSError, ValueError):
+            continue
+        if info.get("estado") == "creando":
+            encolar("fiesta", fiesta=info["id"])
 
 
 if __name__ == "__main__":

@@ -97,6 +97,10 @@
         <div class="opciones" id="movimientos"></div>
         <h3>Fondo</h3>
         <div class="opciones" id="fondos"></div>
+        <h3>Música</h3>
+        <div class="opciones" id="musicas"></div>
+        <p class="suave pequeno">Toquen una canción para escucharla.</p>
+        <audio id="muestra" preload="none"></audio>
         <div id="errorAnimar" class="aviso error oculto"></div>
         <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
           <div class="barra-progreso"><div id="barraTrabajo"></div></div>
@@ -130,6 +134,7 @@ const lado = (n) => n.startsWith("right") ? "der" : n.startsWith("left") ? "izq"
 
 let info = null, catalogo = null;
 let modo = "esqueleto", pincel = "pintar", tipo = "esqueleto", movSel = null, fondoSel = leerLocal("fondo", "parque");
+let musicaSel = null, musicaElegidaAMano = false;
 let puntos = {}, sucio = { puntos: false, mascara: false };
 const lienzo = document.getElementById("lienzo"), ctx = lienzo.getContext("2d");
 const imgTextura = new Image();
@@ -334,9 +339,16 @@ function pintarOpciones() {
   const movs = document.getElementById("movimientos");
   const lista = tipo === "esqueleto" ? catalogo.esqueleto : catalogo.gelatina;
   if (!lista.some((m) => m.id === movSel)) movSel = lista[0].id;
+  // cada movimiento trae una canción sugerida, salvo que hayan escogido otra a mano
+  if (!musicaElegidaAMano) musicaSel = (lista.find((m) => m.id === movSel) || {}).musica || "ninguna";
   movs.replaceChildren(...lista.map((m) => el("button", {
     class: "opcion", type: "button", "aria-pressed": m.id === movSel,
     onclick: () => { movSel = m.id; pintarOpciones(); } }, el("span", { class: "icono" }, m.icono), m.nombre)));
+  const sinMusica = { id: "ninguna", nombre: "Sin música", icono: "🔇" };
+  document.getElementById("musicas").replaceChildren(...[sinMusica, ...catalogo.musica].map((m) => el("button", {
+    class: "opcion", type: "button", "aria-pressed": m.id === musicaSel,
+    onclick: () => { musicaSel = m.id; musicaElegidaAMano = true; escuchar(m); pintarOpciones(); } },
+    el("span", { class: "icono" }, m.icono), m.nombre)));
   document.getElementById("fondos").replaceChildren(...catalogo.fondos.map((f) => el("button", {
     class: "opcion fondo", type: "button", "aria-pressed": f.id === fondoSel,
     onclick: () => { fondoSel = f.id; guardarLocal("fondo", f.id); pintarOpciones(); } },
@@ -349,12 +361,20 @@ function elegirTipo(t) {
 }
 for (const b of document.querySelectorAll("[data-tipo]")) b.addEventListener("click", () => elegirTipo(b.dataset.tipo));
 
+function escuchar(m) {
+  const a = document.getElementById("muestra");
+  if (!m.url || (a.dataset.id === m.id && !a.paused)) { a.pause(); a.dataset.id = ""; return; }
+  a.src = m.url; a.dataset.id = m.id;
+  a.play().catch(() => {});
+}
+
 document.getElementById("btnAnimar").addEventListener("click", async () => {
   const err = document.getElementById("errorAnimar");
   err.classList.add("oculto");
   if (!(await guardar())) { err.textContent = "Antes de animar hay que arreglar esto: " + document.getElementById("estadoGuardar").textContent; err.classList.remove("oculto"); return; }
   try {
-    const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel });
+    document.getElementById("muestra").pause();
+    const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel, musica: musicaSel });
     seguirTrabajo(t.id);
   } catch (e) { err.textContent = e.message; err.classList.remove("oculto"); }
 });
@@ -391,10 +411,11 @@ function pintarVideos() {
   const cont = document.getElementById("videos");
   document.getElementById("sinVideos").classList.toggle("oculto", info.videos.length > 0);
   const fondos = Object.fromEntries(catalogo.fondos.map((f) => [f.id, f.nombre]));
+  const canciones = Object.fromEntries(catalogo.musica.map((m) => [m.id, m.nombre]));
   cont.replaceChildren(...info.videos.map((v) => el("div", { class: "video" },
-    el("video", { src: v.url, poster: v.miniatura_url, controls: true, loop: true, playsinline: true, muted: true, preload: "metadata" }),
+    el("video", { src: v.url, poster: v.miniatura_url, controls: true, loop: true, playsinline: true, preload: "metadata" }),
     el("div", { class: "fila" },
-      el("b", {}, `${v.movimiento_nombre} · ${fondos[v.fondo] || v.fondo}`),
+      el("b", {}, [v.movimiento_nombre, fondos[v.fondo] || v.fondo, canciones[v.musica]].filter(Boolean).join(" · ")),
       el("span", { class: "acciones" },
         el("a", { class: "boton claro", href: v.url, download: `${info.nombre} - ${v.movimiento_nombre}.mp4` }, "⬇ Descargar"),
         el("button", { class: "boton peligro", type: "button", onclick: async () => {

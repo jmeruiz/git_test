@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fiesta · Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+.dos{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:1.2rem;align-items:start}
+@media (max-width:900px){.dos{grid-template-columns:1fr}}
+.invitados{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem}
+.invitado{position:relative;background:var(--hoja);border-radius:14px;box-shadow:0 0 0 2px var(--linea) inset;padding:.6rem;
+  display:flex;flex-direction:column;gap:.4rem;cursor:pointer;text-align:center;font:inherit;color:inherit;border:0}
+.invitado[aria-pressed="true"]{box-shadow:0 0 0 3px var(--naranja) inset;background:#fff6ef}
+.invitado img{width:100%;aspect-ratio:1;object-fit:contain}
+.invitado .numero{position:absolute;top:.4rem;left:.4rem;width:1.8rem;height:1.8rem;border-radius:50%;background:var(--naranja);color:#fff;
+  font-weight:800;display:grid;place-items:center}
+.invitado .modo{font-size:.78rem;font-weight:700;border-radius:999px;padding:.2rem .5rem;background:var(--linea);border:0;cursor:pointer;color:var(--tinta)}
+.fiestas{display:flex;flex-direction:column;gap:1rem}
+.fiesta{display:flex;flex-direction:column;gap:.5rem}
+.fiesta .fila{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header class="barra">
+    <a class="logo" href="/"><img src="/static/logo.svg" width="44" height="44" alt=""><span><b>Dibujos</b> <i>Mágicos</i></span></a>
+    <div class="acciones">
+      <a class="boton claro" href="/funcion">▶ Modo función</a>
+      <a class="boton claro" href="/">← Galería</a>
+    </div>
+  </header>
+  <div>
+    <h1>🎉 Fiesta</h1>
+    <p class="suave">Elijan de 2 a 5 personajes y todos bailan juntos en el mismo video, con música.</p>
+  </div>
+
+  <div class="dos">
+    <section class="panel">
+      <h2>1 · ¿Quiénes vienen?</h2>
+      <p class="suave pequeno">Tóquenlos en el orden en que quieren que salgan, de izquierda a derecha. Debajo de cada uno pueden cambiar si baila con brazos y piernas o como gelatina.</p>
+      <div class="invitados" id="invitados"></div>
+      <p id="sinPersonajes" class="aviso oculto">Primero necesitan al menos dos dibujos listos. <a href="/nuevo">Subir un dibujo</a></p>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:1.2rem;min-width:0">
+      <div class="panel">
+        <h2>2 · ¿Qué bailan?</h2>
+        <div class="opciones" id="bailes"></div>
+        <p class="suave pequeno">Los que son gelatina se mueven a su manera, al mismo ritmo.</p>
+        <h3>Fondo</h3>
+        <div class="opciones" id="fondos"></div>
+        <h3>Música</h3>
+        <div class="opciones" id="musicas"></div>
+        <audio id="muestra" preload="none"></audio>
+        <div id="error" class="aviso error oculto"></div>
+        <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
+          <div class="barra-progreso"><div id="barra"></div></div>
+          <p class="suave pequeno" id="textoTrabajo">Armando la fiesta…</p>
+        </div>
+        <button class="boton naranja grande" id="crear" type="button" disabled>🎉 Crear fiesta</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Fiestas</h2>
+    <div class="fiestas" id="fiestas"></div>
+    <p id="sinFiestas" class="suave">Todavía no hay fiestas.</p>
+  </section>
+</div>
+
+<script src="/static/comun.js"></script>
+<script>
+let catalogo, personajes = [], elegidos = [];   // elegidos: [{id, modo}] en orden
+let baileSel = "bailar", fondoSel = leerLocal("fondo", "parque"), musicaSel = null, musicaAMano = false;
+
+function modoInicial(p) {
+  return p.modo_preferido || ((p.ia || {}).ia_pose ? "esqueleto" : "gelatina");
+}
+function juntar(n) { return n.length > 1 ? n.slice(0, -1).join(", ") + " y " + n[n.length - 1] : n[0] || ""; }
+
+function pintarInvitados() {
+  const cont = document.getElementById("invitados");
+  cont.replaceChildren(...personajes.map((p) => {
+    const i = elegidos.findIndex((e) => e.id === p.id);
+    const elegido = i >= 0;
+    const modo = elegido ? elegidos[i].modo : modoInicial(p);
+    return el("button", { class: "invitado", type: "button", "aria-pressed": elegido, onclick: () => {
+        if (elegido) elegidos.splice(i, 1);
+        else if (elegidos.length < 5) elegidos.push({ id: p.id, modo: modoInicial(p) });
+        pintarTodo();
+      } },
+      elegido ? el("span", { class: "numero" }, String(i + 1)) : null,
+      el("img", { src: p.textura, alt: "", loading: "lazy" }),
+      el("b", {}, p.nombre),
+      elegido ? el("span", { class: "modo", role: "button", tabindex: "0", onclick: (ev) => {
+          ev.stopPropagation();
+          elegidos[i].modo = elegidos[i].modo === "esqueleto" ? "gelatina" : "esqueleto";
+          pintarTodo();
+        } }, modo === "esqueleto" ? "🕺 Brazos y piernas" : "🍮 Gelatina") : null);
+  }));
+  document.getElementById("sinPersonajes").classList.toggle("oculto", personajes.length >= 2);
+}
+
+function pintarOpciones() {
+  if (!musicaAMano) musicaSel = (catalogo.esqueleto.find((m) => m.id === baileSel) || {}).musica || "fiesta";
+  document.getElementById("bailes").replaceChildren(...catalogo.esqueleto.map((m) => el("button", {
+    class: "opcion", type: "button", "aria-pressed": m.id === baileSel,
+    onclick: () => { baileSel = m.id; pintarTodo(); } }, el("span", { class: "icono" }, m.icono), m.nombre)));
+  document.getElementById("fondos").replaceChildren(...catalogo.fondos.map((f) => el("button", {
+    class: "opcion fondo", type: "button", "aria-pressed": f.id === fondoSel,
+    onclick: () => { fondoSel = f.id; guardarLocal("fondo", f.id); pintarTodo(); } },
+    el("img", { src: f.url, alt: "", loading: "lazy" }), el("span", {}, f.nombre))));
+  const sinMusica = { id: "ninguna", nombre: "Sin música", icono: "🔇" };
+  document.getElementById("musicas").replaceChildren(...[sinMusica, ...catalogo.musica].map((m) => el("button", {
+    class: "opcion", type: "button", "aria-pressed": m.id === musicaSel,
+    onclick: () => { musicaSel = m.id; musicaAMano = true; escuchar(m); pintarTodo(); } },
+    el("span", { class: "icono" }, m.icono), m.nombre)));
+}
+
+function pintarTodo() {
+  pintarInvitados();
+  pintarOpciones();
+  document.getElementById("crear").disabled = elegidos.length < 2 || !!trabajando;
+  document.getElementById("crear").textContent = elegidos.length < 2
+    ? "🎉 Elijan al menos 2 personajes" : `🎉 Crear fiesta con ${elegidos.length}`;
+}
+
+function escuchar(m) {
+  const a = document.getElementById("muestra");
+  if (!m.url || (a.dataset.id === m.id && !a.paused)) { a.pause(); a.dataset.id = ""; return; }
+  a.src = m.url; a.dataset.id = m.id; a.play().catch(() => {});
+}
+
+async function pintarFiestas() {
+  const lista = await api("/api/fiestas");
+  const fondos = Object.fromEntries(catalogo.fondos.map((f) => [f.id, f.nombre]));
+  const canciones = Object.fromEntries(catalogo.musica.map((m) => [m.id, m.nombre]));
+  document.getElementById("sinFiestas").classList.toggle("oculto", lista.length > 0);
+  document.getElementById("fiestas").replaceChildren(...lista.map((f) => {
+    const titulo = el("b", {}, `${f.movimiento_nombre} · ${fondos[f.fondo] || f.fondo}` + (canciones[f.musica] ? ` · ${canciones[f.musica]}` : ""));
+    const quienes = el("span", { class: "suave pequeno" }, "Con " + juntar(f.personajes.map((p) => p.nombre)));
+    const acciones = el("span", { class: "acciones" },
+      f.url ? el("a", { class: "boton claro", href: f.url, download: "Fiesta.mp4" }, "⬇ Descargar") : null,
+      el("button", { class: "boton peligro", type: "button", onclick: async () => {
+        if (!confirm("¿Borrar esta fiesta?")) return;
+        await api("/api/fiestas/" + f.id, { method: "DELETE" });
+        pintarFiestas();
+      } }, "Borrar"));
+    let medio;
+    if (f.estado === "listo") medio = el("video", { src: f.url, poster: f.miniatura_url, controls: true, loop: true, playsinline: true, preload: "metadata" });
+    else if (f.estado === "error") medio = el("div", { class: "aviso error" }, f.mensaje || "No se pudo crear esta fiesta.");
+    else medio = el("div", { class: "aviso" }, "Preparando esta fiesta…");
+    return el("div", { class: "fiesta" }, medio, el("div", { class: "fila" }, el("div", {}, titulo, el("br"), quienes), acciones));
+  }));
+  const pendiente = lista.find((f) => f.trabajo);
+  if (pendiente && !trabajando) seguir(pendiente.trabajo);
+}
+
+let trabajando = null;
+async function seguir(tid) {
+  trabajando = tid;
+  pintarTodo();
+  const caja = document.getElementById("trabajo");
+  caja.classList.remove("oculto");
+  const inicio = Date.now();
+  while (true) {
+    let t;
+    try { t = await api("/api/trabajos/" + tid); } catch (e) { break; }
+    document.getElementById("barra").style.width = (t.progreso || 0) + "%";
+    const seg = Math.round((Date.now() - inicio) / 1000);
+    document.getElementById("textoTrabajo").textContent = t.estado === "en_cola"
+      ? `Esperando turno (hay ${t.delante} antes)…` : `Armando la fiesta… ${t.progreso || 0}% · ${seg} s`;
+    if (t.estado === "listo" || t.estado === "error") {
+      if (t.estado === "error") { const e = document.getElementById("error"); e.textContent = t.mensaje; e.classList.remove("oculto"); }
+      break;
+    }
+    await esperar(1000);
+  }
+  caja.classList.add("oculto");
+  trabajando = null;
+  pintarTodo();
+  await pintarFiestas();
+  document.querySelector(".fiesta video")?.play().catch(() => {});
+}
+
+document.getElementById("crear").addEventListener("click", async () => {
+  const err = document.getElementById("error");
+  err.classList.add("oculto");
+  document.getElementById("muestra").pause();
+  try {
+    const f = await apiJSON("/api/fiestas", "POST", { personajes: elegidos, movimiento: baileSel, fondo: fondoSel, musica: musicaSel });
+    await pintarFiestas();
+    seguir(f.trabajo);
+  } catch (e) { err.textContent = e.message; err.classList.remove("oculto"); }
+});
+
+(async () => {
+  catalogo = await api("/api/catalogo");
+  personajes = (await api("/api/personajes")).filter((p) => p.estado === "revisar" || p.estado === "listo");
+  pintarTodo();
+  await pintarFiestas();
+})().catch((e) => document.querySelector(".contenedor").append(el("div", { class: "aviso error" }, e.message)));
+</script>
+</body>
+</html>

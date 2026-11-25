@@ -6,19 +6,20 @@ AD_ROOT = os.environ.get("AD_ROOT", "/opt/AnimatedDrawings")
 # Movimientos con esqueleto: usan capturas de movimiento de personas reales (Meta).
 # (archivo de movimiento, archivo de "retarget" que adapta el movimiento al dibujo)
 MOVIMIENTOS_ESQUELETO = [
-    {"id": "bailar",  "nombre": "Bailar",          "icono": "💃", "motion": "jesse_dance",   "retarget": "mixamo_fff"},
-    {"id": "saludar", "nombre": "Saludar",         "icono": "👋", "motion": "wave_hello",    "retarget": "fair1_ppf"},
-    {"id": "saltar",  "nombre": "Saltar",          "icono": "🦘", "motion": "jumping",       "retarget": "fair1_ppf"},
-    {"id": "brincos", "nombre": "Brincos tijera",  "icono": "⭐", "motion": "jumping_jacks", "retarget": "cmu1_pfp"},
-    {"id": "dab",     "nombre": "Pose de dab",     "icono": "🙆", "motion": "dab",           "retarget": "fair1_ppf"},
+# "musica": canción sugerida; "gelatina": qué hace un personaje gelatina en una fiesta con este baile.
+    {"id": "bailar",  "nombre": "Bailar",         "icono": "💃", "motion": "jesse_dance",   "retarget": "mixamo_fff", "musica": "fiesta",     "gelatina": "menear"},
+    {"id": "saludar", "nombre": "Saludar",        "icono": "👋", "motion": "wave_hello",    "retarget": "fair1_ppf",  "musica": "estrellita", "gelatina": "bambolear"},
+    {"id": "saltar",  "nombre": "Saltar",         "icono": "🦘", "motion": "jumping",       "retarget": "fair1_ppf",  "musica": "saltarin",   "gelatina": "rebotar"},
+    {"id": "brincos", "nombre": "Brincos tijera", "icono": "⭐", "motion": "jumping_jacks", "retarget": "cmu1_pfp",   "musica": "saltarin",   "gelatina": "rebotar"},
+    {"id": "dab",     "nombre": "Pose de dab",    "icono": "🙆", "motion": "dab",           "retarget": "fair1_ppf",  "musica": "cucaracha",  "gelatina": "menear"},
 ]
 
 # Movimientos "gelatina": funcionan con cualquier dibujo, aunque no tenga brazos ni piernas.
 MOVIMIENTOS_GELATINA = [
-    {"id": "rebotar",   "nombre": "Rebotar",   "icono": "🏀"},
-    {"id": "bambolear", "nombre": "Bambolear", "icono": "🍮"},
-    {"id": "flotar",    "nombre": "Flotar",    "icono": "🎈"},
-    {"id": "menear",    "nombre": "Menearse",  "icono": "🎶"},
+    {"id": "rebotar",   "nombre": "Rebotar",   "icono": "🏀", "musica": "saltarin"},
+    {"id": "bambolear", "nombre": "Bambolear", "icono": "🍮", "musica": "cucaracha"},
+    {"id": "flotar",    "nombre": "Flotar",    "icono": "🎈", "musica": "cuna"},
+    {"id": "menear",    "nombre": "Menearse",  "icono": "🎶", "musica": "fiesta"},
 ]
 
 FONDOS = [
