@@ -56,7 +56,7 @@
         <div class="opciones" id="fondos"></div>
         <h3>Música</h3>
         <div class="opciones" id="musicas"></div>
-        <audio id="muestra" preload="none"></audio>
+        <div id="lugarMuestra"></div>
         <div id="error" class="aviso error oculto"></div>
         <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
           <div class="barra-progreso"><div id="barra"></div></div>
@@ -76,6 +76,7 @@
 
 <script src="/static/comun.js"></script>
 <script>
+document.getElementById("lugarMuestra").replaceWith(bloqueMuestra());
 let catalogo, personajes = [], elegidos = [];   // elegidos: [{id, modo}] en orden
 let baileSel = "bailar", fondoSel = leerLocal("fondo", "parque"), musicaSel = null, musicaAMano = false;
 
@@ -119,7 +120,7 @@ function pintarOpciones() {
   const sinMusica = { id: "ninguna", nombre: "Sin música", icono: "🔇" };
   document.getElementById("musicas").replaceChildren(...[sinMusica, ...catalogo.musica].map((m) => el("button", {
     class: "opcion", type: "button", "aria-pressed": m.id === musicaSel,
-    onclick: () => { musicaSel = m.id; musicaAMano = true; escuchar(m); pintarTodo(); } },
+    onclick: () => { musicaSel = m.id; musicaAMano = true; escucharMuestra(m); pintarTodo(); } },
     el("span", { class: "icono" }, m.icono), m.nombre)));
 }
 
@@ -131,11 +132,6 @@ function pintarTodo() {
     ? "🎉 Elijan al menos 2 personajes" : `🎉 Crear fiesta con ${elegidos.length}`;
 }
 
-function escuchar(m) {
-  const a = document.getElementById("muestra");
-  if (!m.url || (a.dataset.id === m.id && !a.paused)) { a.pause(); a.dataset.id = ""; return; }
-  a.src = m.url; a.dataset.id = m.id; a.play().catch(() => {});
-}
 
 async function pintarFiestas() {
   const lista = await api("/api/fiestas");
@@ -192,7 +188,7 @@ async function seguir(tid) {
 document.getElementById("crear").addEventListener("click", async () => {
   const err = document.getElementById("error");
   err.classList.add("oculto");
-  document.getElementById("muestra").pause();
+  pararMuestra();
   try {
     const f = await apiJSON("/api/fiestas", "POST", { personajes: elegidos, movimiento: baileSel, fondo: fondoSel, musica: musicaSel });
     await pintarFiestas();

@@ -82,3 +82,6 @@ video{width:100%;border-radius:14px;background:#000;display:block}
 @keyframes gira{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.cargando{animation-duration:3s}.boton{transition:none}}
 .oculto{display:none!important}
+.bloque-muestra{display:flex;flex-direction:column;gap:.5rem}
+.sonando{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;background:#eef3ff;border-radius:14px;padding:.5rem .6rem .5rem 1rem}
+.sonando .boton{padding:.45rem .9rem;font-size:.92rem}

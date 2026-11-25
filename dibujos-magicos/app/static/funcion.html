@@ -7,95 +7,187 @@
 <link rel="icon" href="/static/logo.svg">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="manifest" href="/static/manifest.webmanifest">
-<meta name="theme-color" content="#fffdf7">
-<link rel="stylesheet" href="/static/estilo.css">
+<meta name="theme-color" content="#14112a">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@700&display=swap">
+<!--
+  Esta página es la que se abre en el navegador de la Smart TV. Los navegadores de tele suelen ser
+  versiones viejas de Chrome, así que aquí todo está escrito "a la antigua": JavaScript clásico (sin
+  ?., async, etc.), sin comun.js, y CSS sin inset/gap/clamp. Se maneja con el control remoto:
+  OK = empezar, flechas ← → = cambiar de video.
+-->
 <style>
-html,body{height:100%}
-body{background:#14112a;color:#fff;padding:0;overflow:hidden}
-.escena{position:fixed;inset:0;display:grid;place-items:center}
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:0;background:#14112a}
-.portada{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4rem;text-align:center;padding:2rem;
-  background:radial-gradient(circle at 50% 40%,#2c2660,#14112a 70%)}
-.portada h1{font-size:clamp(2.4rem,7vw,5.5rem);color:#ffc93c}
-.portada p{font-size:clamp(1.1rem,2.6vw,1.8rem);color:#d8d3f5}
-.titulo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;text-align:center;padding:2rem;
-  background:radial-gradient(circle at 50% 45%,#2c2660,#14112a 75%);transition:opacity .6s}
-.titulo h2{font-size:clamp(2.4rem,8vw,6rem);color:#fff}
-.titulo p{font-size:clamp(1.2rem,3vw,2.2rem);color:#ffc93c;font-family:var(--titulo);font-weight:700}
-.titulo.fuera{opacity:0;pointer-events:none}
-.controles{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:.5rem;opacity:0;transition:opacity .3s}
-body:hover .controles,.controles:focus-within{opacity:1}
-.controles .boton{background:rgba(255,255,255,.14);box-shadow:none}
+html, body { height: 100%; margin: 0; }
+body { background: #14112a; color: #fff; overflow: hidden; font-family: "Nunito", "Segoe UI", Arial, sans-serif; }
+.capa { position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
+video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #14112a; }
+.centro { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; text-align: center;
+  padding: 2rem; box-sizing: border-box;
+  background: #1d1840; background: radial-gradient(circle at 50% 42%, #2c2660, #14112a 72%); }
+.centro > * { margin: .5rem 0; }
+h1, h2 { font-family: "Baloo 2", "Trebuchet MS", Arial, sans-serif; margin: 0; line-height: 1.05; }
+h1 { font-size: 4rem; font-size: 7vw; color: #ffc93c; }
+h2 { font-size: 4.5rem; font-size: 8vw; }
+.sub { font-size: 1.6rem; font-size: 2.6vw; color: #ffc93c; font-family: "Baloo 2", "Trebuchet MS", Arial, sans-serif; font-weight: 700; }
+.suave { color: #d8d3f5; font-size: 1.4rem; font-size: 2vw; }
+.boton { font: 800 1.6rem "Nunito", Arial, sans-serif; font-size: 2.2vw; color: #fff; background: #f07a2b; border: 0; border-radius: 999px;
+  padding: .7em 1.6em; cursor: pointer; }
+.boton:focus { outline: 6px solid #ffc93c; outline-offset: 4px; }
+.boton[disabled] { opacity: .5; }
+.casilla { font-size: 1.4rem; font-size: 2vw; color: #d8d3f5; cursor: pointer; }
+.casilla input { width: 1.2em; height: 1.2em; vertical-align: middle; }
+.casilla:focus-within, .casilla input:focus { outline: 4px solid #ffc93c; outline-offset: 4px; }
+a { color: #d8d3f5; font-size: 1.2rem; font-size: 1.6vw; }
+a:focus { outline: 4px solid #ffc93c; outline-offset: 4px; }
+.titulo { -webkit-transition: opacity .6s; transition: opacity .6s; }
+.fuera { opacity: 0; pointer-events: none; }
+.oculto { display: none !important; }
+.aviso { position: fixed; left: 50%; bottom: 6%; -webkit-transform: translateX(-50%); transform: translateX(-50%);
+  background: rgba(0, 0, 0, .75); color: #fff; padding: .6em 1.2em; border-radius: 999px; font-size: 1.3rem; font-size: 1.8vw; }
+.controles { position: fixed; right: 2%; bottom: 3%; opacity: 0; -webkit-transition: opacity .3s; transition: opacity .3s; }
+.controles.visible, .controles:hover { opacity: 1; }
+.controles .boton { background: rgba(255, 255, 255, .18); font-size: 1.2rem; margin-left: .4rem; }
 </style>
 </head>
 <body>
-<div class="escena">
-  <video id="video" playsinline></video>
-  <div class="titulo fuera" id="titulo"><h2 id="tNombre"></h2><p id="tArtista"></p></div>
-  <div class="portada" id="portada">
-    <img src="/static/logo.svg" width="110" height="110" alt="">
-    <h1>¡Comienza la función!</h1>
-    <p id="cuantos">Buscando videos…</p>
-    <label style="display:flex;gap:.5rem;align-items:center;font-size:1.2rem;color:#d8d3f5;cursor:pointer">
-      <input type="checkbox" id="sonido" checked style="width:1.3rem;height:1.3rem"> 🔊 Con música
-    </label>
-    <button class="boton naranja grande" id="empezar" type="button" disabled>▶ Empezar</button>
-    <a href="/" style="color:#d8d3f5">← Volver a la galería</a>
-  </div>
+<video id="video" playsinline webkit-playsinline preload="auto"></video>
+<div class="capa centro titulo fuera" id="titulo"><h2 id="tNombre"></h2><p class="sub" id="tArtista"></p></div>
+
+<div class="capa centro" id="portada">
+  <img src="/static/logo.svg" width="110" height="110" alt="">
+  <h1>¡Comienza la función!</h1>
+  <p class="suave" id="cuantos">Buscando videos…</p>
+  <label class="casilla"><input type="checkbox" id="sonido" checked> 🔊 Con música</label>
+  <button class="boton" id="empezar" type="button" disabled>▶ Empezar</button>
+  <p class="suave" style="font-size:1.1rem;font-size:1.5vw">Con el control: OK para empezar · ← → para cambiar de video</p>
+  <a href="/">← Volver a la galería</a>
 </div>
-<div class="controles">
+
+<div class="aviso oculto" id="aviso"></div>
+<div class="controles" id="controles">
   <button class="boton" type="button" id="atras" aria-label="Anterior">⏮</button>
   <button class="boton" type="button" id="adelante" aria-label="Siguiente">⏭</button>
   <a class="boton" href="/">Salir</a>
 </div>
-<script src="/static/comun.js"></script>
+
 <script>
-let lista = [], i = 0, temporizador = null;
-const video = document.getElementById("video"), titulo = document.getElementById("titulo");
-async function cargarLista() {
-  lista = await api("/api/funcion");
-  document.getElementById("cuantos").textContent = lista.length
-    ? `${lista.length} ${lista.length === 1 ? "video listo" : "videos listos"}`
-    : "Todavía no hay videos. Creen uno en la galería.";
-  document.getElementById("empezar").disabled = !lista.length;
-}
-function mostrar(n) {
-  if (!lista.length) return;
-  i = (n + lista.length) % lista.length;
-  const v = lista[i];
-  clearTimeout(temporizador);
-  document.getElementById("tNombre").textContent = v.nombre;
-  document.getElementById("tArtista").textContent = v.invitados ? "con " + juntar(v.invitados)
-    : v.artista ? "por " + v.artista : "";
-  titulo.classList.remove("fuera");
-  video.src = v.url;
-  video.load();
-  temporizador = setTimeout(() => { titulo.classList.add("fuera"); video.play().catch(() => {}); }, 2600);
-}
-function juntar(nombres) {
-  return nombres.length > 1 ? nombres.slice(0, -1).join(", ") + " y " + nombres[nombres.length - 1] : nombres[0] || "";
-}
-let vueltas = 0;
-video.addEventListener("ended", async () => {
-  // cada video se ve dos veces seguidas, luego pasa al siguiente
-  if (++vueltas < 2) { video.currentTime = 0; video.play(); return; }
-  vueltas = 0;
-  if (i === lista.length - 1) { try { await cargarLista(); } catch (e) {} }
-  mostrar(i + 1);
-});
-document.getElementById("empezar").addEventListener("click", () => {
-  video.muted = !document.getElementById("sonido").checked;
-  document.documentElement.requestFullscreen?.().catch(() => {});
-  document.getElementById("portada").remove();
-  mostrar(0);
-});
-document.getElementById("adelante").addEventListener("click", () => { vueltas = 0; mostrar(i + 1); });
-document.getElementById("atras").addEventListener("click", () => { vueltas = 0; mostrar(i - 1); });
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowRight") { vueltas = 0; mostrar(i + 1); }
-  if (e.key === "ArrowLeft") { vueltas = 0; mostrar(i - 1); }
-});
-cargarLista().catch((e) => { document.getElementById("cuantos").textContent = e.message; });
+(function () {
+  var lista = [], i = 0, vueltas = 0, temporizador = null, empezo = false;
+  var video = document.getElementById("video");
+  var titulo = document.getElementById("titulo");
+
+  function $(id) { return document.getElementById(id); }
+
+  function pedirLista(listo) {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/funcion");
+    x.onload = function () {
+      try { lista = JSON.parse(x.responseText); } catch (e) { lista = []; }
+      $("cuantos").textContent = lista.length
+        ? lista.length + (lista.length === 1 ? " video listo" : " videos listos")
+        : "Todavía no hay videos. Creen uno desde el celular o la compu.";
+      $("empezar").disabled = !lista.length;
+      if (lista.length && !empezo) $("empezar").focus();
+      if (listo) listo();
+    };
+    x.onerror = function () { $("cuantos").textContent = "No pude conectar con la computadora. ¿Está prendida?"; };
+    x.send();
+  }
+
+  function juntar(n) {
+    if (!n || !n.length) return "";
+    return n.length > 1 ? n.slice(0, -1).join(", ") + " y " + n[n.length - 1] : n[0];
+  }
+
+  function aviso(texto, ms) {
+    var a = $("aviso");
+    a.textContent = texto;
+    a.className = "aviso";
+    clearTimeout(aviso.t);
+    if (ms) aviso.t = setTimeout(function () { a.className = "aviso oculto"; }, ms);
+  }
+
+  function reproducir() {
+    var p = video.play();
+    if (p && p.catch) {
+      p.catch(function () {
+        // Algunas teles no dejan arrancar con sonido: arranca sin sonido y avisa.
+        video.muted = true;
+        var p2 = video.play();
+        if (p2 && p2.catch) p2.catch(function () {});
+        aviso("Para escuchar la música, presionen OK en el control", 5000);
+      });
+    }
+  }
+
+  function mostrar(n) {
+    if (!lista.length) return;
+    i = (n + lista.length) % lista.length;
+    vueltas = 0;
+    var v = lista[i];
+    clearTimeout(temporizador);
+    $("tNombre").textContent = v.nombre;
+    $("tArtista").textContent = v.invitados ? "con " + juntar(v.invitados) : (v.artista ? "por " + v.artista : "");
+    titulo.className = "capa centro titulo";
+    video.pause();
+    video.src = v.url;
+    video.load();
+    temporizador = setTimeout(function () { titulo.className = "capa centro titulo fuera"; reproducir(); }, 2600);
+  }
+
+  video.addEventListener("ended", function () {
+    // cada video se ve dos veces seguidas y luego pasa al siguiente
+    vueltas += 1;
+    if (vueltas < 2) { video.currentTime = 0; reproducir(); return; }
+    if (i === lista.length - 1) pedirLista(function () { mostrar(0); });
+    else mostrar(i + 1);
+  });
+  video.addEventListener("error", function () {
+    aviso("Este video no se pudo abrir en esta pantalla; sigo con el próximo", 4000);
+    setTimeout(function () { mostrar(i + 1); }, 1500);
+  });
+
+  function empezar() {
+    if (empezo || !lista.length) return;
+    empezo = true;
+    video.muted = !$("sonido").checked;
+    var el = document.documentElement;
+    var pedir = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (pedir) {
+      try { var r = pedir.call(el); if (r && r.catch) r.catch(function () {}); } catch (e) { /* la tele no lo permite */ }
+    }
+    $("portada").className = "oculto";
+    mostrar(0);
+  }
+
+  function verControles() {
+    var c = $("controles");
+    c.className = "controles visible";
+    clearTimeout(verControles.t);
+    verControles.t = setTimeout(function () { c.className = "controles"; }, 3000);
+  }
+
+  $("empezar").addEventListener("click", empezar);
+  $("adelante").addEventListener("click", function () { mostrar(i + 1); });
+  $("atras").addEventListener("click", function () { mostrar(i - 1); });
+  document.addEventListener("mousemove", verControles);
+
+  document.addEventListener("keydown", function (e) {
+    var k = e.key || "", c = e.keyCode;
+    if (!empezo) return;  // en la portada, las flechas mueven el foco normalmente
+    if (k === "ArrowRight" || k === "Right" || c === 39 || k === "MediaTrackNext" || c === 176) { e.preventDefault(); mostrar(i + 1); }
+    else if (k === "ArrowLeft" || k === "Left" || c === 37 || k === "MediaTrackPrevious" || c === 177) { e.preventDefault(); mostrar(i - 1); }
+    else if (k === "Enter" || c === 13 || k === " " || c === 32) {
+      e.preventDefault();
+      if (video.muted && $("sonido").checked) { video.muted = false; aviso("🔊 Sonido activado", 2000); }
+      else if (video.paused) reproducir(); else video.pause();
+    } else {
+      verControles();
+    }
+  });
+
+  pedirLista();
+})();
 </script>
 </body>
 </html>

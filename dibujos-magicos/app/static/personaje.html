@@ -102,8 +102,7 @@
         <div class="opciones" id="fondos"></div>
         <h3>Música</h3>
         <div class="opciones" id="musicas"></div>
-        <p class="suave pequeno">Toquen una canción para escucharla.</p>
-        <audio id="muestra" preload="none"></audio>
+        <div id="lugarMuestra"></div>
         <div id="errorAnimar" class="aviso error oculto"></div>
         <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
           <div class="barra-progreso"><div id="barraTrabajo"></div></div>
@@ -123,6 +122,7 @@
 
 <script src="/static/comun.js"></script>
 <script>
+document.getElementById("lugarMuestra").replaceWith(bloqueMuestra());
 const PID = location.pathname.split("/").pop();
 const COLORES = { centro: "#2fb27a", der: "#ff8a3d", izq: "#3a6fe0" };
 const NOMBRES = {
@@ -350,7 +350,7 @@ function pintarOpciones() {
   const sinMusica = { id: "ninguna", nombre: "Sin música", icono: "🔇" };
   document.getElementById("musicas").replaceChildren(...[sinMusica, ...catalogo.musica].map((m) => el("button", {
     class: "opcion", type: "button", "aria-pressed": m.id === musicaSel,
-    onclick: () => { musicaSel = m.id; musicaElegidaAMano = true; escuchar(m); pintarOpciones(); } },
+    onclick: () => { musicaSel = m.id; musicaElegidaAMano = true; escucharMuestra(m); pintarOpciones(); } },
     el("span", { class: "icono" }, m.icono), m.nombre)));
   document.getElementById("fondos").replaceChildren(...catalogo.fondos.map((f) => el("button", {
     class: "opcion fondo", type: "button", "aria-pressed": f.id === fondoSel,
@@ -364,19 +364,13 @@ function elegirTipo(t) {
 }
 for (const b of document.querySelectorAll("[data-tipo]")) b.addEventListener("click", () => elegirTipo(b.dataset.tipo));
 
-function escuchar(m) {
-  const a = document.getElementById("muestra");
-  if (!m.url || (a.dataset.id === m.id && !a.paused)) { a.pause(); a.dataset.id = ""; return; }
-  a.src = m.url; a.dataset.id = m.id;
-  a.play().catch(() => {});
-}
 
 document.getElementById("btnAnimar").addEventListener("click", async () => {
   const err = document.getElementById("errorAnimar");
   err.classList.add("oculto");
   if (!(await guardar())) { err.textContent = "Antes de animar hay que arreglar esto: " + document.getElementById("estadoGuardar").textContent; err.classList.remove("oculto"); return; }
   try {
-    document.getElementById("muestra").pause();
+    pararMuestra();
     const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel, musica: musicaSel });
     seguirTrabajo(t.id);
   } catch (e) { err.textContent = e.message; err.classList.remove("oculto"); }

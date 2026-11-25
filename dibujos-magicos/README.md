@@ -77,8 +77,13 @@ Cada movimiento trae una canción sugerida, y se puede cambiar (tocar una canci�
 | 🪇 La cucaracha | dab, bambolear |
 | 🎉 Fiesta de colores | bailar, menearse |
 | 🐸 Saltarín | saltar, brincos, rebotar |
+| 🎂 Cumpleaños feliz | ¡videos de cumpleaños! |
+| 🔔 Martinillo | tranquila, para cantar |
+| 🎻 Himno de la alegría | tranquila |
+| 🐮 El viejo MacDonald | saltar, rebotar |
+| 🥁 Cumbia alegre | bailar, menearse |
 
-Las tres primeras son canciones tradicionales de dominio público y las dos últimas son originales de este proyecto. Todas las toca un sintetizador incluido en el programa (cajita de música, marimba, xilófono), así que no hay problemas de derechos. Los personajes gelatina se mueven al ritmo de la canción. El volumen está pensado para oídos pequeños.
+Fiesta de colores, Saltarín y Cumbia alegre son originales de este proyecto; las demás son canciones tradicionales o clásicas de dominio público. Todas las toca un sintetizador incluido en el programa (cajita de música, marimba, xilófono, acordeón, güiro…), así que no hay problemas de derechos. Mientras suena la muestra de una canción aparece un botón **⏹ Parar**, y nunca suenan dos cosas a la vez. Los personajes gelatina se mueven al ritmo de la canción. El volumen está pensado para oídos pequeños.
 
 ### Fiesta: varios bailando juntos
 

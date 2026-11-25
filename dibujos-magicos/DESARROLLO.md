@@ -29,6 +29,7 @@ Decisiones que conviene mantener:
 - **Todo local y en archivos.** Cada personaje es una carpeta con `info.json`. No hay base de datos: es fácil de respaldar (copiar `datos/`) y de inspeccionar. Si algún día hace falta, `leer_info` / `guardar_info` son el único punto a cambiar.
 - **Un trabajo a la vez.** Crear videos usa todo el procesador. La cola está en memoria. Al reiniciar, `recuperar_pendientes()` retoma lo que quedó a medias.
 - **El render corre en otro proceso.** OpenGL (OSMesa) y Animated Drawings quedan aislados, y si algo falla no se cae el servidor.
+- **El modo función es para teles.** `static/funcion.html` está escrito en JavaScript clásico (ES5, sin `comun.js`) y CSS sin `inset`/`gap`/`clamp`, porque los navegadores de Smart TV suelen ser versiones viejas de Chrome. Se maneja con el control: OK y flechas.
 - **Python 3.8.** Lo exige Animated Drawings. Nada de sintaxis más nueva (`match`, `list[str]` en tiempo de ejecución, `X | None`). ruff lo revisa con `target-version = "py38"`.
 - **Versiones fijadas** en Dockerfiles y `requirements*.txt`. Animated Drawings está archivado: su versión no va a cambiar, y las nuestras tampoco deberían cambiar sin probar.
 - **Español** en nombres, mensajes y comentarios. Los nombres en inglés que aparecen (`skeleton`, `char_cfg`…) son los que exige Animated Drawings.
@@ -66,7 +67,7 @@ GitHub Actions (`.github/workflows/dibujos-magicos.yml`) corre ruff y las prueba
 
 ## Recetas
 
-**Agregar una canción.** En `motor/musica.py`, agreguen una entrada a `CANCIONES`: `bpm`, `compas`, `estilo` (`suave`, `cuna`, `baile`, `rebote`), `instrumento` (`cajita`, `marimba`, `xilofono`), `melodia` y `acordes` en el formato `"C5:1 G5:.5 R:.5"`. La melodía y los acordes tienen que sumar los mismos tiempos (la prueba lo revisa). Solo usen melodías propias o de dominio público.
+**Agregar una canción.** En `motor/musica.py`, agreguen una entrada a `CANCIONES`: `bpm`, `compas`, `estilo` (`suave`, `cuna`, `vals`, `baile`, `rebote`, `cumbia`), `instrumento` (`cajita`, `marimba`, `xilofono`, `acordeon`), `melodia` y `acordes` en el formato `"C5:1 G5:.5 R:.5"`. La melodía y los acordes tienen que sumar los mismos tiempos (la prueba lo revisa). Solo usen melodías propias o de dominio público.
 
 **Agregar un fondo.** Una imagen de 1280×720 en `static/fondos/<id>.jpg`, con el suelo más o menos al 85 % de la altura, y una línea en `FONDOS` de `catalogo.py`.
 

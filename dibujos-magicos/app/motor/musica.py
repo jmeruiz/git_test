@@ -98,6 +98,43 @@ CANCIONES = {
     },
 }
 
+CANCIONES.update({
+    "cumple": {
+        "nombre": "Cumpleaños feliz", "icono": "🎂", "bpm": 100, "compas": 3, "estilo": "vals", "instrumento": "marimba",
+        "intro": _m("R:2 G4:.75 G4:.25"), "intro_acordes": _m("C:3"),
+        "melodia": _m("""A4:1 G4:1 C5:1  B4:2 G4:.75 G4:.25  A4:1 G4:1 D5:1  C5:2 G4:.75 G4:.25
+                         G5:1 E5:1 C5:1  B4:1 A4:1 F5:.75 F5:.25  E5:1 C5:1 D5:1  C5:2 G4:.75 G4:.25"""),
+        "acordes": _m("C:3 G:3 G:3 C:3 C:3 F:3 C:2 G:1 C:3"),
+    },
+    "martinillo": {
+        "nombre": "Martinillo", "icono": "🔔", "bpm": 112, "compas": 4, "estilo": "suave", "instrumento": "xilofono",
+        "melodia": _m("""C5:1 D5:1 E5:1 C5:1  C5:1 D5:1 E5:1 C5:1  E5:1 F5:1 G5:2  E5:1 F5:1 G5:2
+                         G5:.5 A5:.5 G5:.5 F5:.5 E5:1 C5:1  G5:.5 A5:.5 G5:.5 F5:.5 E5:1 C5:1
+                         C5:1 G4:1 C5:2  C5:1 G4:1 C5:2"""),
+        "acordes": _m("C:4 C:4 C:4 C:4 C:4 C:4 C:2 G:2 C:4"),
+    },
+    "alegria": {
+        "nombre": "Himno de la alegría", "icono": "🎻", "bpm": 104, "compas": 4, "estilo": "suave", "instrumento": "cajita",
+        "melodia": _m("""E5:1 E5:1 F5:1 G5:1  G5:1 F5:1 E5:1 D5:1  C5:1 C5:1 D5:1 E5:1  E5:1.5 D5:.5 D5:2
+                         E5:1 E5:1 F5:1 G5:1  G5:1 F5:1 E5:1 D5:1  C5:1 C5:1 D5:1 E5:1  D5:1.5 C5:.5 C5:2"""),
+        "acordes": _m("C:4 G:4 C:4 G:4 C:4 G:4 C:4 G:2 C:2"),
+    },
+    "granja": {
+        "nombre": "El viejo MacDonald", "icono": "🐮", "bpm": 120, "compas": 4, "estilo": "rebote", "instrumento": "xilofono",
+        "melodia": _m("""C5:1 C5:1 C5:1 G4:1  A4:1 A4:1 G4:2  E5:1 E5:1 D5:1 D5:1  C5:3 G4:1
+                         C5:1 C5:1 C5:1 G4:1  A4:1 A4:1 G4:2  E5:1 E5:1 D5:1 D5:1  C5:4"""),
+        "acordes": _m("C:4 F:2 C:2 C:2 G:2 C:4 C:4 F:2 C:2 C:2 G:2 C:4"),
+    },
+    "cumbia": {
+        "nombre": "Cumbia alegre", "icono": "🥁", "bpm": 100, "compas": 4, "estilo": "cumbia", "instrumento": "acordeon",
+        "melodia": _m("""E5:.5 A5:.5 C6:.5 B5:.5 A5:1 E5:1   F5:.5 A5:.5 D6:.5 C6:.5 A5:1 F5:1
+                         G5:.5 B5:.5 D6:.5 C6:.5 B5:.5 A5:.5 G5:1   E5:.5 G5:.5 C6:1 E6:1 R:1
+                         A5:.5 A5:.5 B5:.5 C6:.5 E6:1 C6:1   D6:.5 C6:.5 B5:.5 A5:.5 F5:1 A5:1
+                         G#5:.5 B5:.5 E6:.5 D6:.5 B5:.5 G#5:.5 E5:1   A5:1.5 E5:.5 A5:1 R:1"""),
+        "acordes": _m("Am:4 Dm:4 G:4 C:4 Am:4 Dm:4 E7:4 Am:4"),
+    },
+})
+
 LISTA = [{"id": k, "nombre": v["nombre"], "icono": v["icono"]} for k, v in CANCIONES.items()]
 
 
@@ -127,6 +164,12 @@ def instrumento(tipo, f, dur):
     elif tipo == "marimba":    # cálida y redondita
         t = _t(max(dur, .9))
         parciales = [(1, 1.0, .5), (3.93, .32, .09), (9.2, .08, .03)]
+    elif tipo == "acordeon":   # dos voces apenas desafinadas, como un acordeón "musette"
+        t = _t(dur + 0.08)
+        env = np.minimum(1, t / .03) * np.clip((dur + 0.08 - t) / .08, 0, 1)
+        s = sum((np.sin(2 * math.pi * f * k * t) + np.sin(2 * math.pi * f * 1.004 * k * t)) / k ** 1.15
+                for k in range(1, 8) if f * k < SR / 2.2)
+        return s * env * .35
     else:                      # xilófono: seco y alegre
         t = _t(max(dur, .55))
         parciales = [(1, 1.0, .28), (3.0, .3, .07), (6.2, .12, .03)]
@@ -175,6 +218,22 @@ def maraca():
     n = int(.07 * SR)
     r = np.diff(_ruido[1000:1001 + n])
     return r * np.exp(-np.arange(n) / SR / .018) * .35
+
+
+def guiro(dur):
+    """Raspado de güiro: ruido cortado en dientecitos."""
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    r = np.diff(_ruido[2000:2001 + n])
+    dientes = (np.sin(2 * math.pi * 95 * t) > 0).astype(float)
+    env = np.minimum(1, t / .01) * np.clip((dur - t) / .02, 0, 1)
+    return r * dientes * env * .5
+
+
+def cencerro():
+    t = _t(.18)
+    s = np.sign(np.sin(2 * math.pi * 562 * t)) * .5 + np.sign(np.sin(2 * math.pi * 845 * t)) * .5
+    return s * np.exp(-t / .045) * .3
 
 
 # ------------------------------------------------------------------ mezcla
@@ -233,10 +292,17 @@ def sintetizar(cancion_id, segundos):
     t = 0.0
     for acorde, d in aco:
         tonos = notas_acorde(acorde, 4)
-        _poner(pista, colchon([hz(m) for m in tonos], d * tiempo), t * tiempo, .07 if estilo in ("baile", "rebote") else .10)
+        _poner(pista, colchon([hz(m) for m in tonos], d * tiempo), t * tiempo, .07 if estilo in ("baile", "rebote", "cumbia") else .10)
         raiz = hz(notas_acorde(acorde, 2)[0])
         if estilo == "cuna":
             _poner(pista, bajo(raiz, d * tiempo * .95), t * tiempo, .22)
+        elif estilo == "vals":  # bajo en el 1, el resto lo llevan las maracas
+            for k in range(0, int(d), 3):
+                _poner(pista, bajo(raiz, .9 * tiempo), (t + k) * tiempo, .24)
+        elif estilo == "cumbia":  # tónica y quinta alternadas
+            for k in range(int(d)):
+                f = raiz if k % 2 == 0 else raiz * 1.5
+                _poner(pista, bajo(f, .8 * tiempo), (t + k) * tiempo, .26 if k % 2 == 0 else .18)
         elif estilo == "suave":
             for k in range(0, int(d), 2):
                 _poner(pista, bajo(raiz, 1.8 * tiempo), (t + k) * tiempo, .22)
@@ -260,8 +326,22 @@ def sintetizar(cancion_id, segundos):
             for medio in (0, .5):
                 _poner(pista, maraca(), (b + medio) * tiempo, .5 if medio else .3, pan=.35)
 
+    if estilo == "vals":
+        for b in range(int(total_tiempos) + 1):
+            if b % c["compas"]:
+                _poner(pista, maraca(), b * tiempo, .35, pan=.3)
+    if estilo == "cumbia":
+        for b in range(int(total_tiempos) + 1):
+            if b % 2 == 0:
+                _poner(pista, bombo(), b * tiempo, .32)
+            # güiro: largo-corto-corto en cada tiempo; cencerro en el contratiempo
+            _poner(pista, guiro(.22 * tiempo), b * tiempo, .30, pan=-.3)
+            _poner(pista, guiro(.1 * tiempo), (b + .5) * tiempo, .22, pan=-.3)
+            _poner(pista, guiro(.1 * tiempo), (b + .75) * tiempo, .22, pan=-.3)
+            _poner(pista, cencerro(), (b + .5) * tiempo, .16, pan=.35)
+
     pista = pista[:int(segundos * SR)]
-    pista = _reverb(pista, mezcla=.22 if estilo in ("cuna", "suave") else .12)
+    pista = _reverb(pista, mezcla=.22 if estilo in ("cuna", "suave", "vals") else .12)
 
     # volumen parejo y suave para oídos pequeños, con entrada y salida suaves
     rms = np.sqrt(np.mean(pista ** 2)) + 1e-9
