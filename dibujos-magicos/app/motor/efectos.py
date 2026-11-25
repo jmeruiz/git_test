@@ -36,25 +36,74 @@ def _llama(ancho, largo, x, y, s, fase):
     return np.array(izq + der[::-1], np.int32)
 
 
+def _region(cuadro, x0, y0, x1, y1):
+    h, w = cuadro.shape[:2]
+    x0, y0, x1, y1 = max(0, int(x0)), max(0, int(y0)), min(w, int(x1)), min(h, int(y1))
+    return (x0, y0, x1, y1) if x0 < x1 and y0 < y1 else None
+
+
 def fuego(cuadro, x, y, ancho, s, fuerza=1.0):
-    """Llama de cohete hacia abajo desde (x, y), en tres capas que titilan, con chispitas."""
+    """
+    Llama de cohete que nace en (x, y) —un poquito dentro del dibujo, que se pinta encima
+    y la tapa, así se ve pegada— y cae hacia abajo. `ancho` es el ancho de la boca.
+
+    Como en los efectos de cine 2D: capas con bordes difuminados (rojo-naranja afuera,
+    amarillo y casi blanco en el centro, más corto, para que el calor parezca salir de la boca),
+    pintadas con transparencia suave, y encima un resplandor que se SUMA como luz.
+    """
     if fuerza <= 0:
         return
-    capa = cuadro.copy()
-    mascara = np.zeros(cuadro.shape[:2], np.uint8)
-    largo = ancho * (0.5 + 1.1 * fuerza) * (1 + 0.08 * math.sin(s * 31))
-    for escala, color, fase in ((1.0, (20, 70, 235), 0.0), (0.72, (0, 160, 255), 1.3), (0.42, (150, 240, 255), 2.1)):
-        forma = _llama(ancho * 1.15 * escala, largo * escala, x, y - 2, s, fase)
-        cv2.fillPoly(capa, [forma], color, cv2.LINE_AA)
-        cv2.fillPoly(mascara, [forma], 255, cv2.LINE_AA)
-    for k in range(int(14 * fuerza) + 4):          # chispitas que saltan
+    largo = ancho * (0.9 + 1.7 * fuerza) * (1 + 0.07 * math.sin(s * 31))
+    margen = ancho * 0.9 + 24
+    r = _region(cuadro, x - ancho - margen, y - margen, x + ancho + margen, y + largo + margen)
+    if not r:
+        return
+    x0, y0, x1, y1 = r
+    h, w = y1 - y0, x1 - x0
+    color = np.zeros((h, w, 3), np.float32)   # color ya multiplicado por su transparencia
+    alfa = np.zeros((h, w), np.float32)
+    capas = (  # (ancho, largo, color BGR, opacidad, difuminado)
+        (1.00, 1.00, (35, 85, 240), 0.80, 0.10),
+        (0.74, 0.74, (20, 150, 255), 0.90, 0.07),
+        (0.46, 0.42, (170, 235, 255), 0.95, 0.05),
+    )
+    for i, (fa, fl, bgr, op, dif) in enumerate(capas):
+        m = np.zeros((h, w), np.uint8)
+        forma = _llama(ancho * fa, largo * fl, x, y, s, fase=i * 1.3) - np.array([x0, y0])
+        cv2.fillPoly(m, [forma.astype(np.int32)], 255, cv2.LINE_AA)
+        m = cv2.GaussianBlur(m, (0, 0), max(1.0, ancho * dif)).astype(np.float32) / 255.0 * op
+        color = color * (1 - m[..., None]) + np.array(bgr, np.float32)[None, None] / 255.0 * m[..., None]
+        alfa = alfa * (1 - m) + m
+    zona = cuadro[y0:y1, x0:x1].astype(np.float32) / 255.0
+    zona = zona * (1 - alfa[..., None]) + color
+
+    # resplandor y chispas: se suman como luz ("screen"), brillan más sobre fondos oscuros
+    luz = np.zeros((h, w), np.uint8)
+    cv2.ellipse(luz, (int(x - x0), int(y - y0 + largo * 0.25)), (int(ancho * 0.95), int(largo * 0.55)), 0, 0, 360, 255, -1)
+    for k in range(int(12 * fuerza) + 3):
         edad = (s * 1.8 + _azar(k, 7)) % 1.0
-        px = x + (_azar(k, 8) - 0.5) * ancho * (0.6 + 1.2 * edad)
-        py = y + largo * (0.3 + 0.9 * edad)
-        r = max(2, int(5 * (1 - edad)))
-        cv2.circle(capa, (int(px), int(py)), r, (60, 200, 255), -1, cv2.LINE_AA)
-        cv2.circle(mascara, (int(px), int(py)), r, int(255 * (1 - edad)), -1, cv2.LINE_AA)
-    _mezclar(cuadro, capa, mascara, 0.95)
+        px = x - x0 + (_azar(k, 8) - 0.5) * ancho * (0.5 + 1.1 * edad)
+        py = y - y0 + largo * (0.45 + 0.75 * edad)
+        cv2.circle(luz, (int(px), int(py)), max(2, int(4 * (1 - edad))), int(255 * (1 - edad)), -1, cv2.LINE_AA)
+    luz = cv2.GaussianBlur(luz, (0, 0), max(2.0, ancho * 0.18)).astype(np.float32) / 255.0 * (0.35 + 0.35 * fuerza)
+    brillo = luz[..., None] * np.array((60, 170, 255), np.float32)[None, None] / 255.0
+    zona = 1 - (1 - zona) * (1 - brillo)
+    cuadro[y0:y1, x0:x1] = np.clip(zona * 255, 0, 255).astype(np.uint8)
+
+
+def resplandor(cuadro, x, y, radio, intensidad):
+    """Luz cálida que la llama echa sobre la parte de abajo del dibujo y el suelo (se suma como luz)."""
+    if intensidad <= 0:
+        return
+    r = _region(cuadro, x - radio, y - radio, x + radio, y + radio)
+    if not r:
+        return
+    x0, y0, x1, y1 = r
+    yy, xx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+    d = np.sqrt((xx - x) ** 2 + (yy - y) ** 2) / radio
+    luz = (np.clip(1 - d, 0, 1) ** 2 * intensidad)[..., None] * np.array((50, 150, 255), np.float32)[None, None] / 255.0
+    zona = cuadro[y0:y1, x0:x1].astype(np.float32) / 255.0
+    cuadro[y0:y1, x0:x1] = np.clip((1 - (1 - zona) * (1 - luz)) * 255, 0, 255).astype(np.uint8)
 
 
 def humo(cuadro, x, y, ancho, s, cantidad=1.0, n=30):

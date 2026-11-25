@@ -277,6 +277,26 @@ class Gelatina:
         escala = min(alto_max / ph, ancho_max / pw)
         self.img = cv2.resize(pj, (max(2, int(pw * escala)), max(2, int(ph * escala))), interpolation=cv2.INTER_AREA)
         self.cx = lugar * ANCHO
+        self.boca = self._boca()
+
+    def _boca(self):
+        """
+        Dónde sale la llama del cohete. Se busca desde abajo la primera fila que ya es "cuerpo"
+        (bastante rellena), no patitas ni rayitas sueltas, y la llama nace un poco más arriba,
+        detrás del dibujo: así el dibujo tapa el inicio y la llama se ve pegada.
+        Devuelve (ancho de la boca, corrimiento horizontal desde el centro, distancia desde abajo).
+        """
+        alfa = self.img[:, :, 3] > 40
+        ph, pw = alfa.shape
+        llenas = alfa.sum(axis=1)
+        if llenas.max() == 0:
+            return pw * 0.4, 0.0, ph * 0.1
+        cuerpo = np.where(llenas >= 0.35 * llenas.max())[0]
+        fila = max(0, cuerpo.max() - int(ph * 0.06))
+        cols = np.where(alfa[fila])[0]
+        ancho = min((cols.max() - cols.min()) * 0.7, pw * 0.6)
+        return max(ancho, pw * 0.15), (cols.max() + cols.min()) / 2 - pw / 2, ph - fila
+
 
     def dibujar(self, cuadro, s):
         ph, pw = self.img.shape[:2]
@@ -340,9 +360,12 @@ class Gelatina:
                 altura, fuerza = ((1 - k) ** 2) * (self.suelo + ph * 0.2), 0.45
             base = self.suelo - altura
             sombra(cuadro, self.cx, self.suelo, pw * max(0.2, 0.8 - altura / ALTO), 0.3 * max(0.2, 1 - altura / ALTO))
-            efectos.fuego(cuadro, cx, base, pw * 0.5, s, fuerza)
+            ancho_boca, corrimiento, adentro = self.boca
+            boca_x, boca_y = cx + corrimiento * sx, base - adentro * sy
+            efectos.fuego(cuadro, boca_x, boca_y, ancho_boca * sx, s, fuerza)   # detrás del dibujo
             img, pivote = transformar(self.img, sx, sy, 0, 0)
             pegar(cuadro, img, cx, base, pivote)
+            efectos.resplandor(cuadro, boca_x, base, ancho_boca * 1.3, 0.35 + 0.3 * fuerza)  # ilumina al dibujo
             return
         elif self.mov == "voltereta":
             c = b % 4                                    # salta y da la vuelta en 2 pulsos, descansa 2
