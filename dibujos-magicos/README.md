@@ -1,6 +1,6 @@
 # Dibujos Mágicos ✨
 
-Una foto de un dibujo de las niñas → un video **con música** donde el dibujo **baila, saluda, salta** o **rebota como gelatina**, con fondos de parque, playa, noche, mar o espacio. Varios dibujos pueden bailar juntos en una **fiesta**. Después se ven todos en grande en la tele con el **modo función**.
+Una foto de un dibujo de las niñas → un video **con música** donde el dibujo **baila, saluda, salta** o **rebota como gelatina**, con fondos de parque, playa, noche, mar, espacio, granja, bosque, jardín o nieve, y con su música o **canciones propias de la familia**. Varios dibujos pueden bailar juntos en una **fiesta**. Después se ven todos en grande en la tele con el **modo función**.
 
 Todo corre en su computadora: las fotos y los videos no salen de la casa.
 
@@ -84,6 +84,18 @@ Cada movimiento trae una canción sugerida, y se puede cambiar (tocar una canci�
 
 Fiesta de colores, Saltarín y Cumbia alegre son originales de este proyecto; las demás son canciones tradicionales o clásicas de dominio público. Todas las toca un sintetizador incluido en el programa (cajita de música, marimba, xilófono, acordeón, güiro…), así que no hay problemas de derechos. Mientras suena la muestra de una canción aparece un botón **⏹ Parar**, y nunca suenan dos cosas a la vez. Los personajes gelatina se mueven al ritmo de la canción. El volumen está pensado para oídos pequeños.
 
+### Mis canciones (música de la familia)
+
+Botón **🎵 Mis canciones** en la página principal, o el enlace "＋ Agregar mis canciones" debajo de la música:
+
+1. Elijan un archivo de música (MP3, M4A, WAV, OGG o FLAC), desde el celular o la compu.
+2. Pónganle nombre y, si quieren, desde qué segundo empieza (por ejemplo, donde arranca el coro).
+3. **Subir canción.** La app empareja el volumen y calcula el ritmo, para que los dibujos bailen al compás.
+
+Después aparece con 🎵 junto a las demás canciones al animar o armar una fiesta. Se pueden cambiar el inicio y el nombre, o borrarla (los videos que ya la usan no cambian).
+
+Sirven las canciones que tengan como archivo (compradas, de un CD) o grabaciones de ustedes cantando. Las de Spotify o YouTube no se pueden descargar como archivo. Para usar Spotify, pongan la música en la tele o el celular y en el modo función quiten "🔊 Con música". Las canciones propias se guardan solo en la computadora, en `datos/canciones`, y no se suben a GitHub.
+
 ### Fiesta: varios bailando juntos
 
 Botón **🎉 Fiesta** en la página principal:
@@ -114,8 +126,8 @@ En la pantalla de inicio del modo función se puede apagar la música. Con las f
 
 ### Dos tipos de movimiento
 
-- **Con brazos y piernas** (bailar, saludar, saltar, brincos tijera, dab): usan movimientos reales de personas, capturados por Meta. Funcionan con dibujos de personas, animales parados, monstruos… cualquier cosa con dos brazos y dos piernas separados del cuerpo.
-- **Gelatina** (rebotar, bambolear, flotar, menearse): funcionan con **cualquier dibujo**, incluso los garabatos de la bebé. Cuando la IA ve que un dibujo no tiene brazos ni piernas, deja este modo seleccionado.
+- **Con brazos y piernas**: bailar, saludar, saltar, brincos tijera y dab usan movimientos reales de personas, capturados por Meta. **Aplaudir, marchar, avión y ¡hurra!** son bailes hechos para este proyecto, que van al ritmo de la canción. Funcionan con dibujos de personas, animales parados, monstruos… cualquier cosa con dos brazos y dos piernas separados del cuerpo.
+- **Gelatina**: rebotar, bambolear, flotar, menearse, **trompo** (con polvito), **nadar** (con burbujas), **cohete** (despega con fuego y humo) y **voltereta** (aterriza con estrellitas). Funcionan con **cualquier dibujo**, incluso los garabatos de la bebé, y se mueven al ritmo de la canción. Cuando la IA ve que un dibujo no tiene brazos ni piernas, deja este modo seleccionado.
 
 ### Consejos para fotos que salgan bien
 

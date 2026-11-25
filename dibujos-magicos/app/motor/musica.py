@@ -12,6 +12,8 @@ import wave
 
 import numpy as np
 
+from motor import canciones
+
 SR = 44100
 NOTAS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
@@ -131,7 +133,16 @@ CANCIONES.update({
 LISTA = [{"id": k, "nombre": v["nombre"], "icono": v["icono"]} for k, v in CANCIONES.items()]
 
 
+def existe(cancion_id):
+    """¿Es una canción que se puede usar? (del sintetizador o de "Mis canciones")."""
+    if canciones.es_propia(cancion_id):
+        return canciones.leer(cancion_id) is not None
+    return cancion_id in CANCIONES
+
+
 def bpm_de(cancion_id):
+    if canciones.es_propia(cancion_id):
+        return canciones.bpm_de(cancion_id)
     c = CANCIONES.get(cancion_id)
     return c["bpm"] if c else 120
 
@@ -285,7 +296,8 @@ def sintetizar(cancion_id, segundos):
     t = 0.0
     for acorde, d in aco:
         tonos = notas_acorde(acorde, 4)
-        _poner(pista, colchon([hz(m) for m in tonos], d * tiempo), t * tiempo, .07 if estilo in ("baile", "rebote", "cumbia") else .10)
+        volumen_colchon = .07 if estilo in ("baile", "rebote", "cumbia") else .10
+        _poner(pista, colchon([hz(m) for m in tonos], d * tiempo), t * tiempo, volumen_colchon)
         raiz = hz(notas_acorde(acorde, 2)[0])
         if estilo == "cuna":
             _poner(pista, bajo(raiz, d * tiempo * .95), t * tiempo, .22)
@@ -346,6 +358,8 @@ def sintetizar(cancion_id, segundos):
 
 
 def escribir_wav(cancion_id, segundos, ruta):
+    if canciones.es_propia(cancion_id):
+        return canciones.escribir_wav(cancion_id, segundos, ruta)
     datos = (sintetizar(cancion_id, segundos) * 32000).astype("<i2")
     with wave.open(str(ruta), "wb") as w:
         w.setnchannels(2)
@@ -356,6 +370,9 @@ def escribir_wav(cancion_id, segundos, ruta):
 
 def duracion_en_compases(cancion_id, minimo):
     """Duración >= minimo que termina justo al final de un compás (para que el corte suene natural)."""
+    if canciones.es_propia(cancion_id):
+        compas = 4 * 60.0 / canciones.bpm_de(cancion_id)
+        return math.ceil(minimo / compas) * compas
     c = CANCIONES.get(cancion_id)
     if not c:
         return minimo

@@ -29,7 +29,7 @@ import cv2
 import numpy as np
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-from motor import catalogo, musica
+from motor import canciones, catalogo, musica
 from motor.anotar import (ErrorAnotacion, ajustar_puntos, anotar, guardar_char_cfg, leer_puntos,
                           modelos_listos, validar_puntos)
 
@@ -263,6 +263,11 @@ def pagina_fiesta():
     return send_from_directory(app.static_folder, "fiesta.html")
 
 
+@app.get("/canciones")
+def pagina_canciones():
+    return send_from_directory(app.static_folder, "canciones.html")
+
+
 @app.get("/ayuda")
 def pagina_ayuda():
     return send_from_directory(app.static_folder, "ayuda.html")
@@ -293,7 +298,53 @@ def estado():
 def api_catalogo():
     return jsonify(esqueleto=catalogo.MOVIMIENTOS_ESQUELETO, gelatina=catalogo.MOVIMIENTOS_GELATINA,
                    fondos=[dict(f, url=f"/static/fondos/{f['id']}.jpg") for f in catalogo.FONDOS],
-                   musica=[dict(m, url=f"/api/musica/{m['id']}.wav") for m in musica.LISTA])
+                   musica=[dict(m, url=f"/api/musica/{m['id']}.wav") for m in musica.LISTA]
+                   + [publico_cancion(c) for c in canciones.lista()])
+
+
+def publico_cancion(c):
+    return {"id": canciones.PREFIJO + c["id"], "nombre": c["nombre"], "icono": "🎵", "propia": True,
+            "url": f"/datos/canciones/{c['id']}/muestra.mp3?v={c['inicio']}", "inicio": c["inicio"],
+            "duracion": c["duracion"], "bpm": c["bpm"]}
+
+
+# ------------------------------------------------------------------ mis canciones
+
+@app.get("/api/canciones")
+def lista_canciones():
+    return jsonify([publico_cancion(c) for c in canciones.lista()])
+
+
+@app.post("/api/canciones")
+def subir_cancion():
+    archivo = request.files.get("archivo")
+    if not archivo or not archivo.filename:
+        return jsonify(error="Falta el archivo de la canción."), 400
+    try:
+        info = canciones.crear(nuevo_id(), archivo, archivo.filename, request.form.get("nombre", "").strip(),
+                               request.form.get("inicio") or 0, ahora())
+    except (canciones.ErrorCancion, ValueError) as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(publico_cancion(info)), 201
+
+
+@app.patch("/api/canciones/<cid>")
+def cambiar_cancion(cid):
+    datos = request.get_json(force=True)
+    try:
+        info = canciones.cambiar(cid, nombre=datos.get("nombre"), inicio=datos.get("inicio"))
+    except (canciones.ErrorCancion, ValueError) as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(publico_cancion(info))
+
+
+@app.delete("/api/canciones/<cid>")
+def borrar_cancion(cid):
+    info = canciones.leer(cid)
+    if not info:
+        abort(404)
+    shutil.rmtree(canciones.carpeta() / info["id"])
+    return jsonify(ok=True)
 
 
 candado_musica = threading.Lock()
@@ -448,7 +499,7 @@ def crear_video(pid):
         return jsonify(error="Ese movimiento no existe."), 400
     fondo = datos.get("fondo") or "papel"
     cancion = datos.get("musica")
-    if cancion not in musica.CANCIONES:
+    if not musica.existe(cancion):
         cancion = "ninguna"
     t = encolar("video", pid, modo=modo, movimiento=mov["id"], fondo=fondo, musica=cancion)
     return jsonify(t), 202
@@ -530,7 +581,7 @@ def crear_fiesta():
         personajes.append({"id": pid, "nombre": info["nombre"], "artista": info.get("artista", ""),
                            "modo": modo, "movimiento": mov})
     cancion = datos.get("musica")
-    if cancion not in musica.CANCIONES:
+    if not musica.existe(cancion):
         cancion = "ninguna"
     fid = nuevo_id()
     c = FIESTAS / fid

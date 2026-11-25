@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mis canciones · Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#fffdf7">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+.dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:1.2rem;align-items:start}
+@media (max-width:860px){.dos{grid-template-columns:1fr}}
+.subir{display:grid;place-items:center;text-align:center;border-radius:var(--radio);border:3px dashed #cfc7b4;background:#fff;padding:1.4rem;cursor:pointer}
+.subir .grande{font-size:2.6rem}
+.cancion{display:flex;flex-direction:column;gap:.6rem;padding:1rem;border-radius:16px;box-shadow:0 0 0 2px var(--linea) inset;background:var(--hoja)}
+.cancion .fila{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.cancion audio{width:100%}
+.cancion input[type=number]{width:6.5rem;font:700 1rem var(--texto);padding:.55rem .7rem;border-radius:12px;border:2px solid var(--linea)}
+.lista{display:flex;flex-direction:column;gap:.9rem}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header class="barra">
+    <a class="logo" href="/"><img src="/static/logo.svg" width="44" height="44" alt=""><span><b>Dibujos</b> <i>Mágicos</i></span></a>
+    <a class="boton claro" href="/">← Galería</a>
+  </header>
+  <div>
+    <h1>🎵 Mis canciones</h1>
+    <p class="suave">Suban sus propias canciones para usarlas en los videos y las fiestas. Se quedan guardadas solo en esta computadora.</p>
+  </div>
+
+  <div class="dos">
+    <section class="panel">
+      <h2>Agregar una canción</h2>
+      <label class="subir" for="archivo">
+        <div id="sinArchivo"><div class="grande">🎶</div><p><b>Elegir un archivo de música</b></p><p class="suave pequeno">MP3, M4A, WAV, OGG o FLAC</p></div>
+        <div id="conArchivo" class="oculto"><div class="grande">✅</div><p><b id="nombreArchivo"></b></p></div>
+      </label>
+      <input id="archivo" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac,.opus" class="oculto">
+      <label class="campo">Nombre
+        <input type="text" id="nombre" maxlength="60" placeholder="Ej.: La canción de las niñas" autocomplete="off">
+      </label>
+      <label class="campo">¿Desde qué segundo empieza? <span class="suave pequeno">(por ejemplo, donde empieza el coro; se puede cambiar después)</span>
+        <input type="text" id="inicio" inputmode="numeric" value="0" autocomplete="off">
+      </label>
+      <div id="error" class="aviso error oculto"></div>
+      <div id="subiendo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
+        <div class="barra-progreso"><div id="barra"></div></div><p class="suave pequeno" id="textoSubiendo">Subiendo…</p>
+      </div>
+      <button class="boton naranja grande" id="subir" type="button" disabled>Subir canción</button>
+      <div class="aviso" style="flex-direction:column;gap:.3rem">
+        <b>¿De dónde saco las canciones?</b>
+        <span class="pequeno">Sirven las que tengan como archivo: compradas, de un CD, o grabaciones de ustedes cantando (la app de notas de voz del teléfono). Las de Spotify o YouTube no se pueden descargar como archivo, así que no sirven aquí.</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Guardadas</h2>
+      <div class="lista" id="lista"></div>
+      <p id="vacia" class="suave">Todavía no hay canciones propias.</p>
+    </section>
+  </div>
+</div>
+<script src="/static/comun.js"></script>
+<script>
+const archivo = document.getElementById("archivo");
+function mmss(seg) { seg = Math.round(seg); return Math.floor(seg / 60) + ":" + String(seg % 60).padStart(2, "0"); }
+function segundos(texto) {
+  // acepta "75" o "1:15"
+  const t = String(texto).trim();
+  if (t.includes(":")) { const [m, s] = t.split(":"); return (+m || 0) * 60 + (+s || 0); }
+  return +t || 0;
+}
+
+archivo.addEventListener("change", () => {
+  const f = archivo.files[0];
+  if (!f) return;
+  document.getElementById("sinArchivo").classList.add("oculto");
+  document.getElementById("conArchivo").classList.remove("oculto");
+  document.getElementById("nombreArchivo").textContent = f.name;
+  const nombre = document.getElementById("nombre");
+  if (!nombre.value) nombre.value = f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
+  document.getElementById("subir").disabled = false;
+});
+
+document.getElementById("subir").addEventListener("click", () => {
+  const f = archivo.files[0];
+  if (!f) return;
+  const err = document.getElementById("error");
+  err.classList.add("oculto");
+  const datos = new FormData();
+  datos.append("archivo", f);
+  datos.append("nombre", document.getElementById("nombre").value);
+  datos.append("inicio", segundos(document.getElementById("inicio").value));
+  document.getElementById("subiendo").classList.remove("oculto");
+  document.getElementById("subir").disabled = true;
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/canciones");
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const p = 100 * e.loaded / e.total;
+    document.getElementById("barra").style.width = p + "%";
+    document.getElementById("textoSubiendo").textContent = p < 100 ? "Subiendo…" : "Preparando la canción (volumen y ritmo)…";
+  };
+  xhr.onload = () => {
+    let r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) {}
+    document.getElementById("subiendo").classList.add("oculto");
+    if (xhr.status === 201) {
+      archivo.value = ""; document.getElementById("nombre").value = ""; document.getElementById("inicio").value = "0";
+      document.getElementById("sinArchivo").classList.remove("oculto"); document.getElementById("conArchivo").classList.add("oculto");
+      cargar();
+    } else {
+      err.textContent = r.error || "No se pudo subir la canción."; err.classList.remove("oculto");
+      document.getElementById("subir").disabled = false;
+    }
+  };
+  xhr.onerror = () => { err.textContent = "Se perdió la conexión con la computadora."; err.classList.remove("oculto"); document.getElementById("subir").disabled = false; };
+  xhr.send(datos);
+});
+
+async function cargar() {
+  const lista = await api("/api/canciones");
+  document.getElementById("vacia").classList.toggle("oculto", lista.length > 0);
+  document.getElementById("lista").replaceChildren(...lista.map((c) => {
+    const inicio = el("input", { type: "number", min: "0", step: "1", value: Math.round(c.inicio), "aria-label": "Segundo de inicio" });
+    const estado = el("span", { class: "suave pequeno" });
+    const audio = el("audio", { src: c.url, controls: true, preload: "none" });
+    return el("div", { class: "cancion" },
+      el("div", { class: "fila", style: "justify-content:space-between" },
+        el("b", {}, "🎵 " + c.nombre),
+        el("span", { class: "suave pequeno" }, `${mmss(c.duracion)} · ritmo ${Math.round(c.bpm)} por minuto`)),
+      audio,
+      el("div", { class: "fila" },
+        el("span", {}, "Empieza en el segundo"), inicio,
+        el("button", { class: "boton claro", type: "button", onclick: async () => {
+          estado.textContent = "Guardando…";
+          try {
+            const r = await apiJSON("/api/canciones/" + c.id, "PATCH", { inicio: +inicio.value || 0 });
+            audio.src = r.url; audio.play().catch(() => {});
+            estado.textContent = `Listo: empieza en ${mmss(r.inicio)}`;
+          } catch (e) { estado.textContent = e.message; }
+        } }, "Guardar y escuchar"),
+        estado),
+      el("div", { class: "fila" },
+        el("button", { class: "boton claro", type: "button", onclick: async () => {
+          const nombre = prompt("Nombre de la canción", c.nombre);
+          if (nombre === null) return;
+          await apiJSON("/api/canciones/" + c.id, "PATCH", { nombre });
+          cargar();
+        } }, "✏️ Cambiar nombre"),
+        el("button", { class: "boton peligro", type: "button", onclick: async () => {
+          if (!confirm(`¿Borrar "${c.nombre}"? Los videos que ya la usan no cambian.`)) return;
+          await api("/api/canciones/" + c.id, { method: "DELETE" });
+          cargar();
+        } }, "Borrar")));
+  }));
+}
+cargar().catch((e) => document.querySelector(".contenedor").append(el("div", { class: "aviso error" }, e.message)));
+</script>
+</body>
+</html>

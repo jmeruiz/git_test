@@ -53,5 +53,6 @@ function bloqueMuestra() {
   };
   for (const ev of ["play", "playing", "pause", "ended", "emptied"]) a.addEventListener(ev, actualizar);
   return el("div", { class: "bloque-muestra" },
-    el("p", { class: "suave pequeno" }, "Toquen una canción para escuchar unos segundos. El video que esté sonando se pausa solo."), a, caja);
+    el("p", { class: "suave pequeno" }, "Toquen una canción para escuchar unos segundos. El video que esté sonando se pausa solo. ",
+      el("a", { href: "/canciones" }, "＋ Agregar mis canciones")), a, caja);
 }

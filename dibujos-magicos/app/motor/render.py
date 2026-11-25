@@ -27,7 +27,7 @@ import cv2
 import numpy as np
 import yaml
 
-from motor import catalogo, musica
+from motor import bailes, catalogo, efectos, musica
 
 ANCHO, ALTO, FPS = 1280, 720, 30
 SEGUNDOS_MINIMOS = 7.5
@@ -106,21 +106,26 @@ def z_inicial(ruta):
 
 # ---------------------------------------------------------------- esqueleto (Animated Drawings de Meta)
 
-def render_esqueletos(personajes, fondo, n_total, tmp):
+def render_esqueletos(personajes, fondo, n_total, tmp, bpm, segundos):
     """Anima con Animated Drawings a los personajes con esqueleto. Devuelve la ruta del video crudo."""
     from animated_drawings import render as ad_render  # importa OpenGL, solo aquí
 
     mov_id = personajes[0]["movimiento"]
     _, mov = catalogo.movimiento(mov_id)
-    cam = camara_escena(n_total, mov_id, z_inicial(catalogo.retarget_cfg(mov)))
+    if mov.get("propio"):
+        # baile hecho por código, al pulso de la canción (ver motor/bailes.py)
+        motion_cfg, retarget_base = bailes.generar(mov_id, bpm, segundos, tmp), bailes.RETARGET
+    else:
+        motion_cfg, retarget_base = catalogo.motion_cfg(mov), catalogo.retarget_cfg(mov)
+    cam = camara_escena(n_total, mov_id, z_inicial(retarget_base))
     lista = []
     for i, p in enumerate(personajes):
-        retarget = catalogo.retarget_cfg(mov)
+        retarget = retarget_base
         if n_total > 1:
             x = x_mundo(p["lugar"], cam, z_inicial(retarget))
             retarget, _ = retarget_movido(retarget, x, tmp, i)
         lista.append({"character_cfg": str(Path(p["carpeta"]).resolve() / "char_cfg.yaml"),
-                      "motion_cfg": catalogo.motion_cfg(mov), "retarget_cfg": retarget})
+                      "motion_cfg": motion_cfg, "retarget_cfg": retarget})
 
     crudo = Path(tmp) / "esqueletos.mp4"
     vista = {"USE_MESA": True, "WINDOW_DIMENSIONS": [ANCHO, ALTO], "BACKGROUND_IMAGE": catalogo.ruta_fondo(fondo)}
@@ -294,6 +299,73 @@ class Gelatina:
             ang = 7 * math.sin(2 * math.pi * b / 6)
             cx = self.cx + 0.35 * self.amplitud * math.sin(2 * math.pi * b / 12)
             sombra(cuadro, cx, self.suelo, pw * 0.6, 0.18)
+        elif self.mov == "trompo":
+            giro = math.cos(math.pi * b)                 # una vuelta cada 2 pulsos
+            sx = max(0.08, abs(giro))
+            espejo = giro < 0                            # de espaldas se ve al revés
+            base = self.suelo - 0.04 * ph * abs(math.sin(2 * math.pi * b))
+            sombra(cuadro, cx, self.suelo, pw * 0.8, 0.3)
+            efectos.polvo(cuadro, cx, self.suelo, pw, s)
+            if sx < 0.6:
+                efectos.rayitas(cuadro, cx, base - ph * 0.5, pw * 0.65, ph * 0.5, s)
+            img, pivote = transformar(self.img[:, ::-1] if espejo else self.img, sx, sy, 0, 0)
+            pegar(cuadro, img, cx, base, pivote)
+            return
+        elif self.mov == "nadar":
+            fase = math.sin(2 * math.pi * b / 16)        # va y viene cada 16 pulsos
+            vel = math.cos(2 * math.pi * b / 16)
+            cx = self.cx + 2.2 * self.amplitud * fase
+            base = self.suelo - 0.35 * ph + 0.06 * ph * math.sin(math.pi * b)
+            ang = (-12 if vel > 0 else 12) + 5 * math.sin(math.pi * b)
+            onda = 0.05 * pw * math.sin(2 * math.pi * b)
+            frente = cx + (pw * 0.45 if vel > 0 else -pw * 0.45)
+            efectos.burbujas(cuadro, frente, base - ph * 0.5, s, semilla=int(self.cx))
+            img, pivote = transformar(self.img if vel > 0 else self.img[:, ::-1], sx, sy, ang, onda)
+            pegar(cuadro, img, cx, base, pivote)
+            return
+        elif self.mov == "cohete":
+            # ciclo de 8 pulsos: tiembla (0-2), despega (2-5), baja suavecito (5-8)
+            c = b % 8
+            if c < 2:
+                altura, fuerza = 0.0, 0.12 + 0.12 * c
+                cx = self.cx + 0.012 * pw * math.sin(40 * s)  # tiembla antes de despegar
+                efectos.humo(cuadro, cx, self.suelo, pw, s, cantidad=0.4 + 0.3 * c)
+            elif c < 5:
+                k = (c - 2) / 3
+                altura, fuerza = (k ** 2) * (self.suelo + ph * 0.2), 1.0
+                sy, sx = 1.12, 0.92
+                efectos.humo(cuadro, self.cx, self.suelo, pw, s, cantidad=max(0.0, 1 - 2 * k))
+            else:
+                k = (c - 5) / 3
+                altura, fuerza = ((1 - k) ** 2) * (self.suelo + ph * 0.2), 0.45
+            base = self.suelo - altura
+            sombra(cuadro, self.cx, self.suelo, pw * max(0.2, 0.8 - altura / ALTO), 0.3 * max(0.2, 1 - altura / ALTO))
+            efectos.fuego(cuadro, cx, base, pw * 0.5, s, fuerza)
+            img, pivote = transformar(self.img, sx, sy, 0, 0)
+            pegar(cuadro, img, cx, base, pivote)
+            return
+        elif self.mov == "voltereta":
+            c = b % 4                                    # salta y da la vuelta en 2 pulsos, descansa 2
+            if c < 2:
+                k = c / 2
+                alto_salto = math.sin(math.pi * k) * 0.45 * ph
+                angulo = -360 * (k * k * (3 - 2 * k))    # empieza y termina suavecito
+                centro_y = self.suelo - ph / 2 - alto_salto
+                sombra(cuadro, cx, self.suelo, pw * (0.8 - 0.3 * math.sin(math.pi * k)), 0.25)
+                img, pivote = transformar(self.img, 1, 1, angulo, 0)
+                a = math.radians(angulo)
+                # gira alrededor del centro: el punto de apoyo se mueve con el giro
+                px, py = cx + (ph / 2) * math.sin(a), centro_y + (ph / 2) * math.cos(a)
+                pegar(cuadro, img, px, py, pivote)
+                return
+            k = (c - 2) / 2
+            aplasta = math.exp(-6 * k) * 0.2
+            sy, sx = 1 - aplasta, 1 + aplasta * 0.7
+            sombra(cuadro, cx, self.suelo, pw * 0.85, 0.3)
+            img, pivote = transformar(self.img, sx, sy, 0, 0)
+            pegar(cuadro, img, cx, self.suelo, pivote)
+            efectos.estrellas(cuadro, cx, self.suelo - ph * 0.55, pw, k)  # encima del dibujo
+            return
         else:  # menear
             lado = math.sin(math.pi * b)
             cx = self.cx + self.amplitud * lado
@@ -314,25 +386,27 @@ def render(escena):
     for p, lugar in zip(pjs, LUGARES[n]):
         p["lugar"] = lugar
     cancion = escena.get("musica")
-    if cancion not in musica.CANCIONES:
+    if not musica.existe(cancion):
         cancion = None
     fondo_img = cv2.resize(cv2.imread(catalogo.ruta_fondo(escena["fondo"])), (ANCHO, ALTO))
     esqueletos = [p for p in pjs if p["modo"] == "esqueleto"]
     gelatinas = [p for p in pjs if p["modo"] != "esqueleto"]
 
+    bpm = musica.bpm_de(cancion) if cancion else 116
+    segundos_musicales = musica.duracion_en_compases(cancion, 8.0) if cancion else 8.0
+
     with tempfile.TemporaryDirectory() as tmp:
         crudo, vueltas = None, 1
         if esqueletos:
-            crudo = render_esqueletos(esqueletos, escena["fondo"], n, tmp)
+            crudo = render_esqueletos(esqueletos, escena["fondo"], n, tmp, bpm, segundos_musicales)
             d = duracion(crudo)
             vueltas = max(1, math.ceil(SEGUNDOS_MINIMOS / d))  # los movimientos cortos se repiten
             segundos = d * vueltas
         else:
-            segundos = musica.duracion_en_compases(cancion, 8.0) if cancion else 8.0
+            segundos = segundos_musicales
         total = int(round(segundos * FPS))
         inicio = 55 if esqueletos else 5
 
-        bpm = musica.bpm_de(cancion) if cancion else 116
         figuras = [Gelatina(p["carpeta"], p["movimiento"], p["lugar"], n, bpm) for p in gelatinas]
         flota = any(p["movimiento"] == "flotar" for p in gelatinas)
 
