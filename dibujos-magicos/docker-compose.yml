@@ -1,0 +1,24 @@
+# Dibujos Mágicos: dos "cajitas" (contenedores) que corren en su computadora.
+#   modelos -> la IA de Meta que encuentra el dibujo y sus brazos/piernas
+#   app     -> la página web (http://localhost:8000) y el motor que crea los videos
+name: dibujos-magicos
+services:
+  modelos:
+    build: ./modelos
+    image: dibujos-magicos-modelos
+    restart: unless-stopped
+
+  app:
+    build: ./app
+    image: dibujos-magicos-app
+    restart: unless-stopped
+    depends_on:
+      - modelos
+    ports:
+      - "8000:8000"
+    environment:
+      # La dirección de la compu en el WiFi (la pone el lanzador) para mostrar el código QR
+      DIRECCION_LAN: ${DIRECCION_LAN:-}
+    volumes:
+      # Aquí se guardan las fotos y los videos, en la carpeta "datos" junto a este archivo
+      - ./datos:/datos

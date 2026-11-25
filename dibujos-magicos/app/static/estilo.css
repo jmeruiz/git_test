@@ -1,0 +1,84 @@
+/* Dibujos Mágicos — papel blanco y colores de crayola */
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap");
+:root{
+  --papel:#fffdf7; --hoja:#ffffff; --tinta:#2a2440; --suave:#6b6585; --linea:#e9e4d8;
+  --azul:#3a6fe0; --naranja:#ff8a3d; --verde:#2fb27a; --rosa:#ef5d8f; --amarillo:#ffc93c; --rojo:#d9483b;
+  --titulo:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --texto:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --radio:18px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--papel);color:var(--tinta);font-family:var(--texto);font-size:17px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 3rem}
+.contenedor{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:1.6rem}
+h1,h2,h3{font-family:var(--titulo);line-height:1.1;margin:0;text-wrap:balance}
+h1{font-size:clamp(2rem,6vw,3rem);font-weight:800}
+h2{font-size:1.6rem;font-weight:700}
+h3{font-size:1.2rem;font-weight:700}
+p{margin:0}
+a{color:var(--azul)}
+.suave{color:var(--suave)}
+.pequeno{font-size:.88rem}
+
+header.barra{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding-block:1.2rem .4rem}
+.logo{display:flex;align-items:center;gap:.6rem;text-decoration:none;color:var(--tinta)}
+.logo span{font-family:var(--titulo);font-weight:800;font-size:1.7rem;letter-spacing:-.01em}
+.logo b{color:var(--naranja)} .logo i{color:var(--azul);font-style:normal}
+.acciones{display:flex;gap:.6rem;flex-wrap:wrap}
+
+.boton{appearance:none;border:0;border-radius:999px;padding:.75rem 1.3rem;font:700 1.02rem var(--texto);cursor:pointer;
+  background:var(--azul);color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;justify-content:center;
+  box-shadow:0 3px 0 rgba(0,0,0,.18);transition:transform .08s}
+.boton:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.boton:focus-visible,.opcion:focus-visible,.tarjeta:focus-visible{outline:3px solid var(--amarillo);outline-offset:3px}
+.boton.naranja{background:var(--naranja)} .boton.verde{background:var(--verde)}
+.boton.claro{background:var(--hoja);color:var(--tinta);box-shadow:0 0 0 2px var(--linea) inset}
+.boton.peligro{background:var(--hoja);color:var(--rojo);box-shadow:0 0 0 2px #f3c9c4 inset}
+.boton.grande{font-size:1.2rem;padding:1rem 1.6rem}
+.boton[disabled]{opacity:.5;cursor:not-allowed}
+
+.aviso{border-radius:var(--radio);padding:1rem 1.2rem;background:#fff4d6;display:flex;gap:.8rem;align-items:flex-start}
+.aviso.error{background:#fde8e5}
+.aviso.ok{background:#e3f6ec}
+
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
+.tarjeta{background:var(--hoja);border-radius:var(--radio);box-shadow:0 0 0 2px var(--linea) inset;overflow:hidden;
+  text-decoration:none;color:inherit;display:flex;flex-direction:column}
+.tarjeta .foto{aspect-ratio:1;background:#fff;display:grid;place-items:center;padding:.8rem}
+.tarjeta .foto img{max-width:100%;max-height:100%;object-fit:contain}
+.tarjeta .pie{padding:.7rem .9rem 1rem;display:flex;flex-direction:column;gap:.15rem;border-top:2px solid var(--linea)}
+.etiqueta{display:inline-block;border-radius:999px;padding:.1rem .6rem;font-size:.78rem;font-weight:700;background:var(--linea);color:var(--tinta)}
+.etiqueta.listo{background:#d8f3e5;color:#16734c} .etiqueta.revisar{background:#fff0c9;color:#8a5a00}
+.etiqueta.procesando{background:#e3ebfd;color:#2449a8} .etiqueta.error{background:#fde1dd;color:#a8291c}
+
+.panel{background:var(--hoja);border-radius:var(--radio);box-shadow:0 0 0 2px var(--linea) inset;padding:1.2rem;display:flex;flex-direction:column;gap:1rem;min-width:0}
+.vacio{text-align:center;padding:3rem 1rem;display:flex;flex-direction:column;gap:1rem;align-items:center}
+.vacio .dibujo{font-size:4rem}
+
+.opciones{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem}
+.opcion{appearance:none;border:0;background:var(--hoja);border-radius:14px;box-shadow:0 0 0 2px var(--linea) inset;padding:.8rem .5rem;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.3rem;font:700 .95rem var(--texto);color:var(--tinta)}
+.opcion .icono{font-size:2rem;line-height:1}
+.opcion[aria-pressed="true"]{box-shadow:0 0 0 3px var(--azul) inset;background:#eef3ff}
+.opcion.fondo{padding:0;overflow:hidden;gap:0}
+.opcion.fondo img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.opcion.fondo span{padding:.4rem}
+
+.barra-progreso{height:14px;border-radius:999px;background:var(--linea);overflow:hidden}
+.barra-progreso div{height:100%;background:linear-gradient(90deg,var(--naranja),var(--amarillo));width:0;transition:width .4s}
+
+.pestanas{display:flex;gap:.4rem;flex-wrap:wrap}
+.pestanas button{appearance:none;border:0;border-radius:999px;padding:.55rem 1rem;font:700 .95rem var(--texto);cursor:pointer;background:var(--linea);color:var(--tinta)}
+.pestanas button[aria-selected="true"]{background:var(--tinta);color:#fff}
+
+input[type=text]{font:600 1.05rem var(--texto);padding:.75rem 1rem;border-radius:12px;border:2px solid var(--linea);width:100%;background:#fff;color:var(--tinta)}
+input[type=text]:focus{outline:none;border-color:var(--azul)}
+label.campo{display:flex;flex-direction:column;gap:.35rem;font-weight:700}
+
+video{width:100%;border-radius:14px;background:#000;display:block}
+.cargando{width:48px;height:48px;border-radius:50%;border:6px solid var(--linea);border-top-color:var(--naranja);animation:gira 1s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.cargando{animation-duration:3s}.boton{transition:none}}
+.oculto{display:none!important}

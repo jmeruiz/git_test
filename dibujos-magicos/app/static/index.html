@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:1.2rem;align-items:stretch}
+@media (max-width:760px){.hero{grid-template-columns:1fr}}
+.hero .panel{justify-content:center}
+.qr{display:flex;gap:1rem;align-items:center}
+.qr img{width:120px;height:120px;background:#fff;border-radius:10px;flex:none}
+.qr code{font-size:1rem;font-weight:700;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header class="barra">
+    <a class="logo" href="/"><img src="/static/logo.svg" width="44" height="44" alt=""><span><b>Dibujos</b> <i>Mágicos</i></span></a>
+    <div class="acciones">
+      <a class="boton claro" href="/funcion">▶ Modo función</a>
+      <a class="boton naranja" href="/nuevo">＋ Nuevo dibujo</a>
+    </div>
+  </header>
+
+  <div id="avisoModelos" class="aviso oculto">
+    <div class="cargando" style="width:28px;height:28px;border-width:4px;flex:none"></div>
+    <p><b>La magia se está despertando.</b> La primera vez tarda uno o dos minutos. Ya pueden subir dibujos: se preparan apenas esté lista.</p>
+  </div>
+
+  <section class="hero">
+    <div class="panel">
+      <h1>Sus dibujos cobran vida</h1>
+      <p class="suave">Tomen una foto de un dibujo, acomoden los puntos de brazos y piernas, y elijan cómo se mueve: bailar, saludar, saltar, o rebotar como gelatina. Después lo ven en grande en la tele.</p>
+    </div>
+    <div class="panel oculto" id="panelQR">
+      <h3>Ábranlo en el celular</h3>
+      <div class="qr"><img id="qrImg" alt="Código QR para abrir en el celular"><div><p class="pequeno suave">Escaneen con la cámara o escriban:</p><code id="qrTexto"></code></div></div>
+      <p class="pequeno suave">El celular tiene que estar en el mismo WiFi que esta computadora.</p>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:1rem">
+    <h2>Galería</h2>
+    <div id="galeria" class="rejilla"></div>
+    <div id="vacio" class="panel vacio oculto">
+      <div class="dibujo">🖍️</div>
+      <h2>Todavía no hay dibujos</h2>
+      <p class="suave">Empiecen con uno: una persona, un animal, un monstruo… lo que sea.</p>
+      <a class="boton naranja grande" href="/nuevo">＋ Subir el primer dibujo</a>
+    </div>
+  </section>
+</div>
+<script src="/static/comun.js"></script>
+<script>
+async function cargar() {
+  const [estado, personajes] = await Promise.all([api("/api/estado"), api("/api/personajes")]);
+  document.getElementById("avisoModelos").classList.toggle("oculto", estado.modelos);
+  if (estado.url_telefono) {
+    document.getElementById("panelQR").classList.remove("oculto");
+    document.getElementById("qrImg").src = "/api/qr.svg?url=" + encodeURIComponent(estado.url_telefono);
+    document.getElementById("qrTexto").textContent = estado.url_telefono;
+  }
+  const g = document.getElementById("galeria");
+  g.replaceChildren(...personajes.map((p) => {
+    const img = p.estado === "procesando" || p.estado === "error"
+      ? el("div", { class: "cargando" }) : el("img", { src: p.textura, alt: p.nombre, loading: "lazy" });
+    if (p.estado === "error") img.className = "", img.textContent = "😕";
+    return el("a", { class: "tarjeta", href: "/personaje/" + p.id },
+      el("div", { class: "foto" }, img),
+      el("div", { class: "pie" },
+        el("h3", {}, p.nombre),
+        p.artista ? el("span", { class: "suave pequeno" }, "Por " + p.artista) : null,
+        el("span", {}, el("span", { class: "etiqueta " + p.estado }, ESTADOS[p.estado] || p.estado),
+          p.videos.length ? " " + p.videos.length + (p.videos.length === 1 ? " video" : " videos") : "")));
+  }));
+  document.getElementById("vacio").classList.toggle("oculto", personajes.length > 0);
+  const pendientes = personajes.some((p) => p.estado === "procesando") || !estado.modelos;
+  setTimeout(cargar, pendientes ? 3000 : 15000);
+}
+cargar().catch((e) => { document.getElementById("galeria").replaceChildren(el("div", { class: "aviso error" }, e.message)); });
+</script>
+</body>
+</html>

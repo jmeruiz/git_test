@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nuevo dibujo · Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start}
+@media (max-width:760px){.dos{grid-template-columns:1fr}}
+.camara{display:grid;place-items:center;aspect-ratio:4/3;border-radius:var(--radio);border:3px dashed #cfc7b4;background:#fff;cursor:pointer;text-align:center;padding:1rem;overflow:hidden}
+.camara img{max-width:100%;max-height:100%;object-fit:contain}
+.camara .grande{font-size:3.4rem}
+.consejos{margin:0;padding-left:1.2rem;display:flex;flex-direction:column;gap:.3rem}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header class="barra">
+    <a class="logo" href="/"><img src="/static/logo.svg" width="44" height="44" alt=""><span><b>Dibujos</b> <i>Mágicos</i></span></a>
+    <a class="boton claro" href="/">← Galería</a>
+  </header>
+  <h1>Nuevo dibujo</h1>
+  <form id="forma" class="dos">
+    <div style="display:flex;flex-direction:column;gap:.8rem">
+      <label class="camara" for="foto" id="zonaFoto">
+        <div id="sinFoto"><div class="grande">📷</div><p><b>Tomar foto o elegir imagen</b></p><p class="suave pequeno">Toquen aquí</p></div>
+        <img id="vista" class="oculto" alt="Vista previa del dibujo">
+      </label>
+      <input id="foto" name="foto" type="file" accept="image/*" capture="environment" class="oculto">
+    </div>
+    <div class="panel">
+      <label class="campo">¿Cómo se llama el personaje?
+        <input type="text" id="nombre" name="nombre" placeholder="Ej.: El perrito feliz" maxlength="60" autocomplete="off">
+      </label>
+      <label class="campo">¿Quién lo dibujó?
+        <input type="text" id="artista" name="artista" list="artistas" placeholder="Nombre de la artista" maxlength="40" autocomplete="off">
+        <datalist id="artistas"></datalist>
+      </label>
+      <div>
+        <h3>Para que salga mejor</h3>
+        <ul class="consejos suave">
+          <li>Papel blanco, foto de frente y con buena luz.</li>
+          <li>Que el dibujo llene casi toda la foto.</li>
+          <li>Si tiene brazos y piernas separados del cuerpo, puede bailar. Si es un garabato, puede rebotar o bambolearse.</li>
+        </ul>
+      </div>
+      <div id="error" class="aviso error oculto"></div>
+      <div id="subiendo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
+        <div class="barra-progreso"><div id="barra"></div></div><p class="suave pequeno">Subiendo la foto…</p>
+      </div>
+      <button class="boton naranja grande" id="enviar" type="submit" disabled>✨ Darle vida</button>
+    </div>
+  </form>
+</div>
+<script src="/static/comun.js"></script>
+<script>
+const foto = document.getElementById("foto"), vista = document.getElementById("vista");
+const artistas = leerLocal("artistas", []);
+document.getElementById("artistas").replaceChildren(...artistas.map((a) => el("option", { value: a })));
+if (artistas[0]) document.getElementById("artista").value = artistas[0];
+foto.addEventListener("change", () => {
+  const f = foto.files[0];
+  if (!f) return;
+  vista.src = URL.createObjectURL(f);
+  vista.classList.remove("oculto");
+  document.getElementById("sinFoto").classList.add("oculto");
+  document.getElementById("enviar").disabled = false;
+});
+document.getElementById("forma").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const datos = new FormData(ev.target);
+  const artista = datos.get("artista").trim();
+  if (artista) guardarLocal("artistas", [artista, ...artistas.filter((a) => a !== artista)].slice(0, 8));
+  const err = document.getElementById("error");
+  err.classList.add("oculto");
+  document.getElementById("subiendo").classList.remove("oculto");
+  document.getElementById("enviar").disabled = true;
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/personajes");
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) document.getElementById("barra").style.width = (100 * e.loaded / e.total) + "%"; };
+  xhr.onload = () => {
+    let r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status === 201) location.href = "/personaje/" + r.id;
+    else { err.textContent = r.error || "No se pudo subir la foto."; err.classList.remove("oculto"); document.getElementById("enviar").disabled = false; document.getElementById("subiendo").classList.add("oculto"); }
+  };
+  xhr.onerror = () => { err.textContent = "Se perdió la conexión con la computadora. ¿Siguen en el mismo WiFi?"; err.classList.remove("oculto"); document.getElementById("enviar").disabled = false; };
+  xhr.send(datos);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Personaje · Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+.cabeza{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap}
+.cabeza > div{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+.dos{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.2rem;align-items:start}
+@media (max-width:900px){.dos{grid-template-columns:1fr}}
+.lienzo{position:relative;background:#fff;border-radius:14px;box-shadow:0 0 0 2px var(--linea) inset;display:grid;place-items:center;padding:.6rem;touch-action:none}
+.lienzo canvas{max-width:100%;max-height:68vh;touch-action:none;cursor:crosshair;display:block}
+.herramientas{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.herramientas input[type=range]{width:130px}
+.leyenda{display:flex;gap:1rem;flex-wrap:wrap;font-size:.85rem}
+.leyenda span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:.35rem;vertical-align:-1px;background:var(--c)}
+.videos{display:flex;flex-direction:column;gap:1rem}
+.video{display:flex;flex-direction:column;gap:.5rem}
+.video .fila{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}
+.estado-grande{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:3rem 1rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header class="barra">
+    <a class="logo" href="/"><img src="/static/logo.svg" width="44" height="44" alt=""><span><b>Dibujos</b> <i>Mágicos</i></span></a>
+    <a class="boton claro" href="/">← Galería</a>
+  </header>
+
+  <div class="cabeza">
+    <div>
+      <h1 id="nombre">…</h1>
+      <span id="artista" class="suave"></span>
+    </div>
+    <div class="acciones">
+      <button class="boton claro" id="btnRenombrar" type="button">✏️ Cambiar nombre</button>
+      <button class="boton peligro" id="btnBorrar" type="button">Borrar dibujo</button>
+    </div>
+  </div>
+
+  <div id="vistaProcesando" class="panel estado-grande oculto">
+    <div class="cargando"></div>
+    <h2>Buscando el dibujo en la foto…</h2>
+    <p class="suave" id="textoProcesando">Esto tarda unos segundos.</p>
+  </div>
+
+  <div id="vistaError" class="panel estado-grande oculto">
+    <div style="font-size:3rem">😕</div>
+    <h2>No pude preparar este dibujo</h2>
+    <p class="suave" id="textoError"></p>
+    <button class="boton" id="btnReintentar" type="button">Intentar de nuevo</button>
+  </div>
+
+  <div id="vistaLista" class="dos oculto">
+    <!-- Editor -->
+    <section class="panel">
+      <div class="pestanas" role="tablist">
+        <button role="tab" aria-selected="true" data-modo="esqueleto" type="button">1 · Puntos del cuerpo</button>
+        <button role="tab" aria-selected="false" data-modo="recorte" type="button">2 · Recorte</button>
+      </div>
+      <div id="notaIA" class="aviso"></div>
+      <div id="notaPiezas" class="aviso oculto"></div>
+      <div class="lienzo"><canvas id="lienzo" aria-label="Dibujo con los puntos del esqueleto"></canvas></div>
+
+      <div id="herrEsqueleto" class="leyenda">
+        <span style="--c:#2fb27a">Cabeza, pecho y cadera</span>
+        <span style="--c:#ff8a3d">Un lado</span>
+        <span style="--c:#3a6fe0">El otro lado</span>
+      </div>
+      <p id="ayudaEsqueleto" class="suave pequeno">Arrastren cada punto a su lugar: cabeza, pecho, cadera, y en cada lado hombro → codo → mano y cadera → rodilla → pie.</p>
+
+      <div id="herrRecorte" class="herramientas oculto">
+        <button class="opcion" type="button" data-pincel="pintar" aria-pressed="true" style="flex-direction:row;padding:.5rem .9rem">🖌️ Agregar</button>
+        <button class="opcion" type="button" data-pincel="borrar" aria-pressed="false" style="flex-direction:row;padding:.5rem .9rem">🧽 Quitar</button>
+        <label class="pequeno suave">Tamaño <input type="range" id="tamPincel" min="4" max="80" value="22"></label>
+        <button class="boton claro" type="button" id="btnDeshacer">↶ Deshacer</button>
+      </div>
+      <p id="ayudaRecorte" class="suave pequeno oculto">Lo que se ve gris es papel y no se va a mover. Con 🖌️ pinten las partes del dibujo que falten; con 🧽 borren lo que no es dibujo.</p>
+
+      <div class="herramientas">
+        <button class="boton verde" type="button" id="btnGuardar" disabled>Guardar cambios</button>
+        <span id="estadoGuardar" class="suave pequeno"></span>
+      </div>
+    </section>
+
+    <!-- Animar + videos -->
+    <section style="display:flex;flex-direction:column;gap:1.2rem;min-width:0">
+      <div class="panel">
+        <h2>¡A animar!</h2>
+        <div class="pestanas" role="tablist" id="tipos">
+          <button role="tab" type="button" data-tipo="esqueleto" aria-selected="true">Con brazos y piernas</button>
+          <button role="tab" type="button" data-tipo="gelatina" aria-selected="false">Gelatina (cualquier dibujo)</button>
+        </div>
+        <div class="opciones" id="movimientos"></div>
+        <h3>Fondo</h3>
+        <div class="opciones" id="fondos"></div>
+        <div id="errorAnimar" class="aviso error oculto"></div>
+        <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
+          <div class="barra-progreso"><div id="barraTrabajo"></div></div>
+          <p class="suave pequeno" id="textoTrabajo">Creando la animación…</p>
+        </div>
+        <button class="boton naranja grande" id="btnAnimar" type="button">✨ Crear animación</button>
+      </div>
+
+      <div class="panel">
+        <h2>Videos</h2>
+        <div class="videos" id="videos"></div>
+        <p id="sinVideos" class="suave">Todavía no hay videos de este personaje.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/comun.js"></script>
+<script>
+const PID = location.pathname.split("/").pop();
+const COLORES = { centro: "#2fb27a", der: "#ff8a3d", izq: "#3a6fe0" };
+const NOMBRES = {
+  neck: "Cabeza", torso: "Pecho", hip: "Cadera",
+  right_shoulder: "Hombro", right_elbow: "Codo", right_hand: "Mano", right_hip: "Cadera", right_knee: "Rodilla", right_foot: "Pie",
+  left_shoulder: "Hombro", left_elbow: "Codo", left_hand: "Mano", left_hip: "Cadera", left_knee: "Rodilla", left_foot: "Pie",
+};
+const HUESOS = [["hip", "torso"], ["torso", "neck"], ["torso", "right_shoulder"], ["right_shoulder", "right_elbow"], ["right_elbow", "right_hand"],
+  ["torso", "left_shoulder"], ["left_shoulder", "left_elbow"], ["left_elbow", "left_hand"], ["hip", "right_hip"], ["right_hip", "right_knee"],
+  ["right_knee", "right_foot"], ["hip", "left_hip"], ["left_hip", "left_knee"], ["left_knee", "left_foot"]];
+const lado = (n) => n.startsWith("right") ? "der" : n.startsWith("left") ? "izq" : "centro";
+
+let info = null, catalogo = null;
+let modo = "esqueleto", pincel = "pintar", tipo = "esqueleto", movSel = null, fondoSel = leerLocal("fondo", "parque");
+let puntos = {}, sucio = { puntos: false, mascara: false };
+const lienzo = document.getElementById("lienzo"), ctx = lienzo.getContext("2d");
+const imgTextura = new Image();
+const mascara = document.createElement("canvas"), mctx = mascara.getContext("2d");
+const deshacer = [];
+
+// ---------------------------------------------------------------- carga
+async function cargar() {
+  info = await api("/api/personajes/" + PID);
+  document.title = info.nombre + " · Dibujos Mágicos";
+  document.getElementById("nombre").textContent = info.nombre;
+  document.getElementById("artista").textContent = info.artista ? "Por " + info.artista : "";
+  for (const id of ["vistaProcesando", "vistaError", "vistaLista"]) document.getElementById(id).classList.add("oculto");
+  if (info.estado === "procesando") {
+    document.getElementById("vistaProcesando").classList.remove("oculto");
+    const est = await api("/api/estado");
+    document.getElementById("textoProcesando").textContent = est.modelos ? "Esto tarda unos segundos."
+      : "La magia se está despertando (la primera vez tarda uno o dos minutos).";
+    setTimeout(cargar, 2000);
+    return;
+  }
+  if (info.estado === "error") {
+    document.getElementById("vistaError").classList.remove("oculto");
+    document.getElementById("textoError").textContent = info.mensaje || "";
+    return;
+  }
+  document.getElementById("vistaLista").classList.remove("oculto");
+  if (!catalogo) {
+    catalogo = await api("/api/catalogo");
+    // si la IA no vio brazos y piernas, empezar con los movimientos gelatina
+    if (!(info.ia || {}).ia_pose) elegirTipo("gelatina"); else pintarOpciones();
+  }
+  await cargarEditor();
+  pintarVideos();
+  const enCurso = info.trabajos.find((t) => t.tipo === "video");
+  if (enCurso) seguirTrabajo(enCurso.id);
+}
+
+function notas() {
+  const n = document.getElementById("notaIA");
+  const ia = info.ia || {};
+  if (ia.ia_pose) { n.className = "aviso ok"; n.textContent = "La IA encontró el dibujo y puso los puntos. Revisen que estén en su lugar."; }
+  else { n.className = "aviso"; n.textContent = "Parece un dibujo sin brazos ni piernas, así que les dejé listo el modo gelatina. Si sí los tiene, acomoden los puntos y elijan \"Con brazos y piernas\"."; }
+  const p = document.getElementById("notaPiezas");
+  p.classList.toggle("oculto", !(info.piezas > 1));
+  p.textContent = `El recorte tiene ${info.piezas} partes sueltas. Con brazos y piernas solo se mueve la más grande: únanlas con el pincel 🖌️ en "Recorte", o usen gelatina.`;
+}
+
+async function cargarEditor() {
+  notas();
+  puntos = {};
+  for (const [k, v] of Object.entries(info.puntos)) puntos[k] = [v[0], v[1]];
+  await new Promise((ok, mal) => { imgTextura.onload = ok; imgTextura.onerror = mal; imgTextura.src = info.textura; });
+  lienzo.width = mascara.width = imgTextura.naturalWidth;
+  lienzo.height = mascara.height = imgTextura.naturalHeight;
+  const m = new Image();
+  await new Promise((ok, mal) => { m.onload = ok; m.onerror = mal; m.src = info.mascara; });
+  // la máscara se guarda como "blanco = dibujo"; aquí la convertimos en transparencia
+  mctx.clearRect(0, 0, mascara.width, mascara.height);
+  mctx.drawImage(m, 0, 0);
+  const d = mctx.getImageData(0, 0, mascara.width, mascara.height);
+  for (let i = 0; i < d.data.length; i += 4) { const a = d.data[i]; d.data[i] = d.data[i + 1] = d.data[i + 2] = 255; d.data[i + 3] = a > 127 ? 255 : 0; }
+  mctx.putImageData(d, 0, 0);
+  sucio = { puntos: false, mascara: false };
+  deshacer.length = 0;
+  actualizarGuardar();
+  dibujar();
+}
+
+// ---------------------------------------------------------------- dibujo
+const velo = document.createElement("canvas"), vctx = velo.getContext("2d");
+function escalaPantalla() { return lienzo.width / lienzo.getBoundingClientRect().width || 1; }
+function dibujar() {
+  ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+  ctx.drawImage(imgTextura, 0, 0);
+  // velo gris sobre lo que es papel
+  velo.width = lienzo.width; velo.height = lienzo.height;
+  vctx.globalCompositeOperation = "source-over";
+  vctx.fillStyle = modo === "recorte" ? "rgba(70,70,90,.62)" : "rgba(255,255,255,.72)";
+  vctx.fillRect(0, 0, velo.width, velo.height);
+  vctx.globalCompositeOperation = "destination-out";
+  vctx.drawImage(mascara, 0, 0);
+  ctx.drawImage(velo, 0, 0);
+  if (modo !== "esqueleto") return;
+  const s = escalaPantalla();
+  ctx.lineCap = "round";
+  for (const [a, b] of HUESOS) {
+    ctx.strokeStyle = "rgba(42,36,64,.75)"; ctx.lineWidth = 5 * s;
+    ctx.beginPath(); ctx.moveTo(...puntos[a]); ctx.lineTo(...puntos[b]); ctx.stroke();
+  }
+  for (const [n, [x, y]] of Object.entries(puntos)) {
+    if (n === "root") continue;
+    const r = (n === arrastrando ? 13 : 10) * s;
+    ctx.fillStyle = COLORES[lado(n)]; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (n === arrastrando || n === "neck") {
+      ctx.font = `700 ${15 * s}px Nunito, sans-serif`; ctx.textAlign = "center";
+      ctx.lineWidth = 4 * s; ctx.strokeStyle = "#fff"; ctx.strokeText(NOMBRES[n], x, y - r - 6 * s);
+      ctx.fillStyle = "#2a2440"; ctx.fillText(NOMBRES[n], x, y - r - 6 * s);
+    }
+  }
+}
+window.addEventListener("resize", () => info && info.puntos && dibujar());
+
+// ---------------------------------------------------------------- interacción
+let arrastrando = null, pintando = false, ultimo = null;
+function aImagen(ev) {
+  const r = lienzo.getBoundingClientRect();
+  return [(ev.clientX - r.left) * lienzo.width / r.width, (ev.clientY - r.top) * lienzo.height / r.height];
+}
+lienzo.addEventListener("pointerdown", (ev) => {
+  const p = aImagen(ev);
+  lienzo.setPointerCapture(ev.pointerId);
+  if (modo === "esqueleto") {
+    let mejor = null, dist = 30 * escalaPantalla();
+    for (const [n, q] of Object.entries(puntos)) {
+      if (n === "root") continue;
+      const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (d < dist) { dist = d; mejor = n; }
+    }
+    arrastrando = mejor;
+    dibujar();
+  } else {
+    deshacer.push(mctx.getImageData(0, 0, mascara.width, mascara.height));
+    if (deshacer.length > 20) deshacer.shift();
+    pintando = true; ultimo = p; trazo(p);
+  }
+});
+lienzo.addEventListener("pointermove", (ev) => {
+  const p = aImagen(ev);
+  if (arrastrando) {
+    const x = Math.max(0, Math.min(lienzo.width - 1, p[0])), y = Math.max(0, Math.min(lienzo.height - 1, p[1]));
+    puntos[arrastrando] = [x, y];
+    if (arrastrando === "hip") puntos.root = [x, y];
+    sucio.puntos = true; actualizarGuardar(); dibujar();
+  } else if (pintando) { trazo(p); }
+});
+const soltar = () => { if (arrastrando) { arrastrando = null; dibujar(); } pintando = false; ultimo = null; };
+lienzo.addEventListener("pointerup", soltar);
+lienzo.addEventListener("pointercancel", soltar);
+
+function trazo(p) {
+  const tam = +document.getElementById("tamPincel").value * escalaPantalla();
+  mctx.globalCompositeOperation = pincel === "pintar" ? "source-over" : "destination-out";
+  mctx.strokeStyle = mctx.fillStyle = "#fff"; mctx.lineWidth = tam; mctx.lineCap = "round";
+  mctx.beginPath(); mctx.moveTo(...(ultimo || p)); mctx.lineTo(...p); mctx.stroke();
+  mctx.globalCompositeOperation = "source-over";
+  ultimo = p; sucio.mascara = true; actualizarGuardar(); dibujar();
+}
+document.getElementById("btnDeshacer").addEventListener("click", () => {
+  const d = deshacer.pop();
+  if (d) { mctx.putImageData(d, 0, 0); sucio.mascara = true; actualizarGuardar(); dibujar(); }
+});
+for (const b of document.querySelectorAll("[data-pincel]")) b.addEventListener("click", () => {
+  pincel = b.dataset.pincel;
+  for (const o of document.querySelectorAll("[data-pincel]")) o.setAttribute("aria-pressed", o === b);
+});
+for (const b of document.querySelectorAll("[data-modo]")) b.addEventListener("click", () => {
+  modo = b.dataset.modo;
+  for (const o of document.querySelectorAll("[data-modo]")) o.setAttribute("aria-selected", o === b);
+  const esq = modo === "esqueleto";
+  for (const id of ["herrEsqueleto", "ayudaEsqueleto"]) document.getElementById(id).classList.toggle("oculto", !esq);
+  for (const id of ["herrRecorte", "ayudaRecorte"]) document.getElementById(id).classList.toggle("oculto", esq);
+  dibujar();
+});
+
+// ---------------------------------------------------------------- guardar
+function actualizarGuardar() {
+  const hay = sucio.puntos || sucio.mascara;
+  document.getElementById("btnGuardar").disabled = !hay;
+  document.getElementById("estadoGuardar").textContent = hay ? "Hay cambios sin guardar." : "";
+}
+function mascaraPNG() {
+  const c = document.createElement("canvas"); c.width = mascara.width; c.height = mascara.height;
+  const k = c.getContext("2d"); k.fillStyle = "#000"; k.fillRect(0, 0, c.width, c.height); k.drawImage(mascara, 0, 0);
+  return c.toDataURL("image/png");
+}
+async function guardar() {
+  if (!sucio.puntos && !sucio.mascara) return true;
+  const cuerpo = {};
+  if (sucio.puntos) cuerpo.puntos = puntos;
+  if (sucio.mascara) cuerpo.mascara = mascaraPNG();
+  const est = document.getElementById("estadoGuardar");
+  est.textContent = "Guardando…";
+  try {
+    const r = await apiJSON(`/api/personajes/${PID}/anotaciones`, "PUT", cuerpo);
+    info.piezas = r.piezas; info.version = r.version;
+    sucio = { puntos: false, mascara: false };
+    actualizarGuardar(); notas();
+    est.textContent = "Guardado ✓";
+    return true;
+  } catch (e) {
+    est.textContent = e.message;
+    return false;
+  }
+}
+document.getElementById("btnGuardar").addEventListener("click", guardar);
+window.addEventListener("beforeunload", (ev) => { if (sucio.puntos || sucio.mascara) { ev.preventDefault(); ev.returnValue = ""; } });
+
+// ---------------------------------------------------------------- animar
+function pintarOpciones() {
+  const movs = document.getElementById("movimientos");
+  const lista = tipo === "esqueleto" ? catalogo.esqueleto : catalogo.gelatina;
+  if (!lista.some((m) => m.id === movSel)) movSel = lista[0].id;
+  movs.replaceChildren(...lista.map((m) => el("button", {
+    class: "opcion", type: "button", "aria-pressed": m.id === movSel,
+    onclick: () => { movSel = m.id; pintarOpciones(); } }, el("span", { class: "icono" }, m.icono), m.nombre)));
+  document.getElementById("fondos").replaceChildren(...catalogo.fondos.map((f) => el("button", {
+    class: "opcion fondo", type: "button", "aria-pressed": f.id === fondoSel,
+    onclick: () => { fondoSel = f.id; guardarLocal("fondo", f.id); pintarOpciones(); } },
+    el("img", { src: f.url, alt: "", loading: "lazy" }), el("span", {}, f.nombre))));
+}
+function elegirTipo(t) {
+  tipo = t;
+  for (const o of document.querySelectorAll("[data-tipo]")) o.setAttribute("aria-selected", o.dataset.tipo === t);
+  pintarOpciones();
+}
+for (const b of document.querySelectorAll("[data-tipo]")) b.addEventListener("click", () => elegirTipo(b.dataset.tipo));
+
+document.getElementById("btnAnimar").addEventListener("click", async () => {
+  const err = document.getElementById("errorAnimar");
+  err.classList.add("oculto");
+  if (!(await guardar())) { err.textContent = "Antes de animar hay que arreglar esto: " + document.getElementById("estadoGuardar").textContent; err.classList.remove("oculto"); return; }
+  try {
+    const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel });
+    seguirTrabajo(t.id);
+  } catch (e) { err.textContent = e.message; err.classList.remove("oculto"); }
+});
+
+async function seguirTrabajo(tid) {
+  const caja = document.getElementById("trabajo"), btn = document.getElementById("btnAnimar");
+  caja.classList.remove("oculto"); btn.disabled = true;
+  const inicio = Date.now();
+  while (true) {
+    let t;
+    try { t = await api("/api/trabajos/" + tid); } catch (e) { break; }
+    document.getElementById("barraTrabajo").style.width = (t.progreso || 0) + "%";
+    const seg = Math.round((Date.now() - inicio) / 1000);
+    document.getElementById("textoTrabajo").textContent =
+      t.estado === "en_cola" ? `Esperando turno (hay ${t.delante} antes)…`
+      : `Creando la animación… ${t.progreso || 0}% · ${seg} s`;
+    if (t.estado === "listo") {
+      info = await api("/api/personajes/" + PID);
+      pintarVideos();
+      document.querySelector(".video video")?.play().catch(() => {});
+      break;
+    }
+    if (t.estado === "error") {
+      const err = document.getElementById("errorAnimar");
+      err.textContent = t.mensaje; err.classList.remove("oculto");
+      break;
+    }
+    await esperar(1000);
+  }
+  caja.classList.add("oculto"); btn.disabled = false;
+}
+
+function pintarVideos() {
+  const cont = document.getElementById("videos");
+  document.getElementById("sinVideos").classList.toggle("oculto", info.videos.length > 0);
+  const fondos = Object.fromEntries(catalogo.fondos.map((f) => [f.id, f.nombre]));
+  cont.replaceChildren(...info.videos.map((v) => el("div", { class: "video" },
+    el("video", { src: v.url, poster: v.miniatura_url, controls: true, loop: true, playsinline: true, muted: true, preload: "metadata" }),
+    el("div", { class: "fila" },
+      el("b", {}, `${v.movimiento_nombre} · ${fondos[v.fondo] || v.fondo}`),
+      el("span", { class: "acciones" },
+        el("a", { class: "boton claro", href: v.url, download: `${info.nombre} - ${v.movimiento_nombre}.mp4` }, "⬇ Descargar"),
+        el("button", { class: "boton peligro", type: "button", onclick: async () => {
+          if (!confirm("¿Borrar este video?")) return;
+          await api(`/api/personajes/${PID}/videos/${v.id}`, { method: "DELETE" });
+          info = await api("/api/personajes/" + PID); pintarVideos();
+        } }, "Borrar"))))));
+}
+
+// ---------------------------------------------------------------- nombre / borrar / reintentar
+document.getElementById("btnRenombrar").addEventListener("click", async () => {
+  const nombre = prompt("¿Cómo se llama el personaje?", info.nombre);
+  if (nombre === null) return;
+  const artista = prompt("¿Quién lo dibujó?", info.artista || "");
+  const r = await apiJSON("/api/personajes/" + PID, "PATCH", { nombre, artista: artista ?? info.artista });
+  info.nombre = r.nombre; info.artista = r.artista;
+  document.getElementById("nombre").textContent = r.nombre;
+  document.getElementById("artista").textContent = r.artista ? "Por " + r.artista : "";
+});
+document.getElementById("btnBorrar").addEventListener("click", async () => {
+  if (!confirm("¿Borrar este dibujo y todos sus videos? No se puede deshacer.")) return;
+  sucio = { puntos: false, mascara: false };
+  await api("/api/personajes/" + PID, { method: "DELETE" });
+  location.href = "/";
+});
+document.getElementById("btnReintentar").addEventListener("click", async () => {
+  await api(`/api/personajes/${PID}/reintentar`, { method: "POST" });
+  cargar();
+});
+
+cargar().catch((e) => {
+  document.querySelector(".contenedor").append(el("div", { class: "aviso error" }, e.message));
+});
+</script>
+</body>
+</html>

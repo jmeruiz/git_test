@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Función · Dibujos Mágicos</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+html,body{height:100%}
+body{background:#14112a;color:#fff;padding:0;overflow:hidden}
+.escena{position:fixed;inset:0;display:grid;place-items:center}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:0;background:#14112a}
+.portada{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4rem;text-align:center;padding:2rem;
+  background:radial-gradient(circle at 50% 40%,#2c2660,#14112a 70%)}
+.portada h1{font-size:clamp(2.4rem,7vw,5.5rem);color:#ffc93c}
+.portada p{font-size:clamp(1.1rem,2.6vw,1.8rem);color:#d8d3f5}
+.titulo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;text-align:center;padding:2rem;
+  background:radial-gradient(circle at 50% 45%,#2c2660,#14112a 75%);transition:opacity .6s}
+.titulo h2{font-size:clamp(2.4rem,8vw,6rem);color:#fff}
+.titulo p{font-size:clamp(1.2rem,3vw,2.2rem);color:#ffc93c;font-family:var(--titulo);font-weight:700}
+.titulo.fuera{opacity:0;pointer-events:none}
+.controles{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:.5rem;opacity:0;transition:opacity .3s}
+body:hover .controles,.controles:focus-within{opacity:1}
+.controles .boton{background:rgba(255,255,255,.14);box-shadow:none}
+</style>
+</head>
+<body>
+<div class="escena">
+  <video id="video" muted playsinline></video>
+  <div class="titulo fuera" id="titulo"><h2 id="tNombre"></h2><p id="tArtista"></p></div>
+  <div class="portada" id="portada">
+    <img src="/static/logo.svg" width="110" height="110" alt="">
+    <h1>¡Comienza la función!</h1>
+    <p id="cuantos">Buscando videos…</p>
+    <button class="boton naranja grande" id="empezar" type="button" disabled>▶ Empezar</button>
+    <a href="/" style="color:#d8d3f5">← Volver a la galería</a>
+  </div>
+</div>
+<div class="controles">
+  <button class="boton" type="button" id="atras" aria-label="Anterior">⏮</button>
+  <button class="boton" type="button" id="adelante" aria-label="Siguiente">⏭</button>
+  <a class="boton" href="/">Salir</a>
+</div>
+<script src="/static/comun.js"></script>
+<script>
+let lista = [], i = 0, temporizador = null;
+const video = document.getElementById("video"), titulo = document.getElementById("titulo");
+async function cargarLista() {
+  lista = await api("/api/funcion");
+  document.getElementById("cuantos").textContent = lista.length
+    ? `${lista.length} ${lista.length === 1 ? "video listo" : "videos listos"}`
+    : "Todavía no hay videos. Creen uno en la galería.";
+  document.getElementById("empezar").disabled = !lista.length;
+}
+function mostrar(n) {
+  if (!lista.length) return;
+  i = (n + lista.length) % lista.length;
+  const v = lista[i];
+  clearTimeout(temporizador);
+  document.getElementById("tNombre").textContent = v.nombre;
+  document.getElementById("tArtista").textContent = v.artista ? "por " + v.artista : "";
+  titulo.classList.remove("fuera");
+  video.src = v.url;
+  video.load();
+  temporizador = setTimeout(() => { titulo.classList.add("fuera"); video.play().catch(() => {}); }, 2600);
+}
+let vueltas = 0;
+video.addEventListener("ended", async () => {
+  // cada video se ve dos veces seguidas, luego pasa al siguiente
+  if (++vueltas < 2) { video.currentTime = 0; video.play(); return; }
+  vueltas = 0;
+  if (i === lista.length - 1) { try { await cargarLista(); } catch (e) {} }
+  mostrar(i + 1);
+});
+document.getElementById("empezar").addEventListener("click", () => {
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  document.getElementById("portada").remove();
+  mostrar(0);
+});
+document.getElementById("adelante").addEventListener("click", () => { vueltas = 0; mostrar(i + 1); });
+document.getElementById("atras").addEventListener("click", () => { vueltas = 0; mostrar(i - 1); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight") { vueltas = 0; mostrar(i + 1); }
+  if (e.key === "ArrowLeft") { vueltas = 0; mostrar(i - 1); }
+});
+cargarLista().catch((e) => { document.getElementById("cuantos").textContent = e.message; });
+</script>
+</body>
+</html>
