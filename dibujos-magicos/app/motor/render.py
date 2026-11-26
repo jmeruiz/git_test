@@ -227,15 +227,19 @@ class SombrasDeContacto:
         self.franjas = [(max(0, int((lugar - mitad) * ANCHO)), min(ANCHO, int((lugar + mitad) * ANCHO)))
                         for lugar in lugares]
         self.suelo = [None] * n
+        self.cajas = [None] * n      # (centro_x, arriba, pies) de cada personaje en este cuadro
 
     def dibujar(self, cuadro, alfa):
         for i, (x0, x1) in enumerate(self.franjas):
             zona = alfa[:, x0:x1] > 60
             filas = np.where(zona.any(axis=1))[0]
             if not len(filas):
+                self.cajas[i] = None
                 continue
             pies = filas[-1]
             alto = pies - filas[0]
+            cols_todo = np.where(zona.any(axis=0))[0]
+            self.cajas[i] = (x0 + (cols_todo[0] + cols_todo[-1]) / 2, filas[0], pies)
             abajo = zona[max(0, pies - int(alto * 0.12)):pies + 1]
             cols = np.where(abajo.any(axis=0))[0]
             if not len(cols):
@@ -370,6 +374,13 @@ class Gelatina:
         return max(ancho, pw * 0.15), (cols.max() + cols.min()) / 2 - pw / 2, ph - fila
 
 
+    def _flotar(self, b, ph):
+        """Posición de "flotar" en el pulso b: (base, ángulo, centro_x)."""
+        base = self.suelo - 0.2 * ph - 0.08 * ph * math.sin(2 * math.pi * b / 8)
+        ang = 7 * math.sin(2 * math.pi * b / 6)
+        cx = self.cx + 0.9 * self.amplitud * math.sin(2 * math.pi * b / 12)
+        return base, ang, cx
+
     def dibujar(self, cuadro, s):
         dibujo = self.temblor.aplicar(self.img, s) if self.temblor else self.img
         ph, pw = self.img.shape[:2]
@@ -400,10 +411,11 @@ class Gelatina:
             sx = 2 - sy
             sombra(cuadro, cx, self.suelo, pw * 0.9, 0.3)
         elif self.mov == "flotar":
-            base = self.suelo - 0.2 * ph - 0.08 * ph * math.sin(2 * math.pi * b / 8)
-            ang = 7 * math.sin(2 * math.pi * b / 6)
-            cx = self.cx + 0.35 * self.amplitud * math.sin(2 * math.pi * b / 12)
+            base, ang, cx = self._flotar(b, ph)
             sombra(cuadro, cx, self.suelo, pw * 0.6, 0.18)
+            # arcoíris detrás, que aparece y se desvanece suavecito cada 8 pulsos
+            brillo = math.sin(math.pi * ((b % 8) / 8)) ** 2
+            efectos.arcoiris(cuadro, cx, base - ph * 0.35, max(pw, ph) * 0.78, max(6, int(ph * 0.045)), 0.8 * brillo)
         elif self.mov == "trompo":
             giro = math.cos(math.pi * b)                 # una vuelta cada 2 pulsos
             sx = max(0.08, abs(giro))
@@ -499,6 +511,20 @@ class Gelatina:
         pegar(cuadro, img, cx, base, pivote)
 
 
+def efectos_baile(cuadro, baile, cajas, b, s):
+    """Efectos que acompañan a los bailes propios: corazones, confeti y polvito, al pulso."""
+    for i, caja in enumerate(cajas):
+        if caja is None:
+            continue
+        cx, arriba, pies = caja
+        if baile == "aplaudir":                      # aplauso en el pulso 1 de cada 2
+            efectos.corazones(cuadro, cx, arriba - 10, ((b - 1) % 2) / 1.2, semilla=i * 7 + int((b - 1) // 2))
+        elif baile == "hurra":                       # brazos arriba en el pulso 1 de cada 2
+            efectos.confeti(cuadro, cx, arriba + 20, ((b - 0.8) % 2) / 1.4, semilla=i * 5 + int((b - 0.8) // 2))
+        elif baile == "marchar" and b % 1 < 0.35:     # polvito en cada paso
+            efectos.impacto(cuadro, cx, pies, 60, (b % 1) / 0.35, n=0)
+
+
 # ---------------------------------------------------------------- escena completa
 
 def armar_audio(escena, cancion, segundos, bpm, personajes, tmp):
@@ -586,6 +612,7 @@ def render(escena):
                     rgba = temblor.aplicar(rgba, s)
                 sombras.dibujar(cuadro, rgba[:, :, 3])
                 poner_capa(cuadro, rgba)
+                efectos_baile(cuadro, esqueletos[0]["movimiento"], sombras.cajas, s * bpm / 60.0, s)
             for g in figuras:
                 g.dibujar(cuadro, s)
             escenario.adelante(cuadro, s)

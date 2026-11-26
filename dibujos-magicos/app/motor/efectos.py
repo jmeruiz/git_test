@@ -234,3 +234,56 @@ def impacto(cuadro, x, y, ancho, k, n=9):
         cv2.circle(capa, (cx, int(y - r * 0.5)), r, (225, 230, 235), -1, cv2.LINE_AA)
         cv2.circle(mascara, (cx, int(y - r * 0.5)), r, int(220 * (1 - k)), -1, cv2.LINE_AA)
     _mezclar(cuadro, capa, mascara, 0.85)
+
+
+def _corazon(cuadro, x, y, r, color):
+    cv2.circle(cuadro, (int(x - r * 0.5), int(y)), int(r * 0.55), color, -1, cv2.LINE_AA)
+    cv2.circle(cuadro, (int(x + r * 0.5), int(y)), int(r * 0.55), color, -1, cv2.LINE_AA)
+    pts = np.array([(x - r * 1.02, y + r * 0.15), (x + r * 1.02, y + r * 0.15), (x, y + r * 1.25)], np.int32)
+    cv2.fillPoly(cuadro, [pts], color, cv2.LINE_AA)
+
+
+def corazones(cuadro, x, y, k, n=5, semilla=0):
+    """Corazoncitos que suben y se desvanecen desde (x, y). k de 0 a 1 = lo que va desde que salieron."""
+    if not 0 <= k < 1:
+        return
+    capa = cuadro.copy()
+    mascara = np.zeros(cuadro.shape[:2], np.uint8)
+    colores = [(130, 90, 245), (170, 120, 255), (90, 70, 230)]
+    for i in range(n):
+        px = x + (i - (n - 1) / 2) * 34 + math.sin(k * 6 + i) * 10
+        py = y - k * 150 - 25 * _azar(i, semilla)
+        r = 11 + 6 * _azar(i, semilla + 1)
+        _corazon(capa, px, py, r, colores[i % 3])
+        _corazon(mascara, px, py, r, int(255 * (1 - k)))
+    _mezclar(cuadro, capa, mascara, 0.95)
+
+
+def confeti(cuadro, x, y, k, n=26, semilla=0):
+    """Lluvia de papelitos de colores que salen hacia arriba y caen. k de 0 a 1."""
+    if not 0 <= k < 1:
+        return
+    colores = [(60, 200, 255), (255, 140, 80), (120, 220, 120), (220, 120, 230), (80, 120, 255)]
+    for i in range(n):
+        a = math.pi * (0.15 + 0.7 * _azar(i, semilla + 2))
+        v = 260 + 180 * _azar(i, semilla + 3)
+        px = x - math.cos(a) * v * k
+        py = y - math.sin(a) * v * k + 420 * k * k            # sube y después cae
+        giro = (k * 720 + i * 40) % 180
+        cv2.ellipse(cuadro, (int(px), int(py)), (7, 3), giro, 0, 360, colores[i % 5], -1, cv2.LINE_AA)
+
+
+def arcoiris(cuadro, x, y, radio, grosor, opacidad=0.85):
+    """Arco de arcoíris centrado en (x, y), detrás de algo (se dibuja antes que el personaje)."""
+    if opacidad <= 0:
+        return
+    colores = [(60, 60, 235), (40, 150, 255), (60, 220, 255), (90, 200, 90), (230, 160, 60), (200, 90, 120)]
+    capa = cuadro.copy()
+    mascara = np.zeros(cuadro.shape[:2], np.uint8)
+    for j, color in enumerate(colores):
+        r = int(radio - j * grosor)
+        if r <= 0:
+            break
+        cv2.ellipse(capa, (int(x), int(y)), (r, r), 0, 180, 360, color, grosor + 1, cv2.LINE_AA)
+        cv2.ellipse(mascara, (int(x), int(y)), (r, r), 0, 180, 360, 255, grosor + 1, cv2.LINE_AA)
+    _mezclar(cuadro, capa, mascara, opacidad)

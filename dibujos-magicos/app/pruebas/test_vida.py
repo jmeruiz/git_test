@@ -34,6 +34,17 @@ def test_fondos_con_vida(fondo):
         assert not np.array_equal(c1, c2), "el fondo se mueve"
 
 
+def test_efectos_de_baile():
+    c = np.zeros((360, 640, 3), np.uint8)
+    efectos.corazones(c, 320, 200, 0.3)
+    efectos.confeti(c, 320, 200, 0.4)
+    efectos.arcoiris(c, 320, 250, 150, 10)
+    assert c.any()
+    cajas = [(320, 100, 300), None]
+    for baile in ("aplaudir", "hurra", "marchar", "bailar"):
+        render.efectos_baile(np.zeros((360, 640, 3), np.uint8), baile, cajas, 1.1, 0.5)
+
+
 def test_impacto_y_lineas_de_velocidad():
     c = np.zeros((360, 640, 3), np.uint8)
     efectos.impacto(c, 320, 300, 120, 0.2)

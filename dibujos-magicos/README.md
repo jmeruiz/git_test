@@ -90,6 +90,7 @@ Fiesta de colores, Saltarín y Cumbia alegre son originales de este proyecto; la
 - **Fondos con vida:** nubes que pasan, estrellas que titilan y estrellas fugaces, peces y rayos de luz en el mar, mariposas, pajaritos, copos de nieve, hojas y pétalos que caen.
 - **Sombras de contacto:** cada personaje tiene su sombra en el suelo, que se achica cuando salta.
 - **Trucos de animación** (Disney y anime): los gelatina se aplastan al caer y se estiran cuando van rápido, con líneas de velocidad, un destello de impacto al aterrizar y estelas en la voltereta.
+- **Efectos en los bailes:** corazones al aplaudir, confeti en el ¡hurra!, polvito en cada paso al marchar y un arcoíris detrás al flotar.
 - **🔊 Efectos de sonido** (vienen activados): *boing* al rebotar, retumbo, *fiuuu* y golpe en el cohete, *swish* y *¡tadá!* en la voltereta, burbujas al nadar, y aplausos, pasitos y campanitas en los bailes nuevos. Caen justo con el movimiento y se pueden apagar.
 
 ### Mis canciones (música de la familia)
