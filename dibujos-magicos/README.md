@@ -84,6 +84,14 @@ Cada movimiento trae una canción sugerida, y se puede cambiar (tocar una canci�
 
 Fiesta de colores, Saltarín y Cumbia alegre son originales de este proyecto; las demás son canciones tradicionales o clásicas de dominio público. Todas las toca un sintetizador incluido en el programa (cajita de música, marimba, xilófono, acordeón, güiro…), así que no hay problemas de derechos. Mientras suena la muestra de una canción aparece un botón **⏹ Parar**, y nunca suenan dos cosas a la vez. Los personajes gelatina se mueven al ritmo de la canción. El volumen está pensado para oídos pequeños.
 
+### Más vida en los videos
+
+- **✏️ Dibujado a mano** (viene activado): las líneas del dibujo tiemblan un poquito, como en los dibujos animados hechos a mano. Esto se llama *line boil*.
+- **Fondos con vida:** nubes que pasan, estrellas que titilan y estrellas fugaces, peces y rayos de luz en el mar, mariposas, pajaritos, copos de nieve, hojas y pétalos que caen.
+- **Sombras de contacto:** cada personaje tiene su sombra en el suelo, que se achica cuando salta.
+- **Trucos de animación** (Disney y anime): los gelatina se aplastan al caer y se estiran cuando van rápido, con líneas de velocidad, un destello de impacto al aterrizar y estelas en la voltereta.
+- **🔊 Efectos de sonido** (vienen activados): *boing* al rebotar, retumbo, *fiuuu* y golpe en el cohete, *swish* y *¡tadá!* en la voltereta, burbujas al nadar, y aplausos, pasitos y campanitas en los bailes nuevos. Caen justo con el movimiento y se pueden apagar.
+
 ### Mis canciones (música de la familia)
 
 Botón **🎵 Mis canciones** en la página principal, o el enlace "＋ Agregar mis canciones" debajo de la música:

@@ -36,9 +36,9 @@ def test_retarget_movido_solo_cambia_la_x(tmp_path):
     assert nuevo[1:] == original.read_text().splitlines()[1:]
 
 
-def _escena(tmp_path, personajes, musica="saltarin"):
+def _escena(tmp_path, personajes, musica="saltarin", sonidos=True):
     salida = tmp_path / "v.mp4"
-    escena = {"fondo": "playa", "musica": musica, "personajes": personajes,
+    escena = {"fondo": "playa", "musica": musica, "sonidos": sonidos, "personajes": personajes,
               "salida": str(salida), "miniatura": str(tmp_path / "v.jpg")}
     ruta = tmp_path / "escena.json"
     ruta.write_text(json.dumps(escena))
@@ -70,6 +70,6 @@ def test_fiesta_con_esqueleto_y_gelatina(tmp_path, foto, sin_modelos):
         pj.mkdir()
         anotar.anotar(foto(nombre), pj)
         personajes.append({"carpeta": str(pj), "modo": modo, "movimiento": mov})
-    salida = _escena(tmp_path, personajes, musica="ninguna")
+    salida = _escena(tmp_path, personajes, musica="ninguna", sonidos=False)
     assert flujos(salida) == ["video"]
     assert render.duracion(salida) >= 7.5

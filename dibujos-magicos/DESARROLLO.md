@@ -23,6 +23,9 @@ celular / compu ──HTTP──▶ app (Flask + waitress, :8000) ──HTTP─�
 | `app/motor/bailes.py` | Bailes con esqueleto hechos por código (BVH al pulso de la canción). |
 | `app/motor/efectos.py` | Fuego, humo, burbujas, polvo y estrellas de los movimientos gelatina. |
 | `app/motor/bvh.py` | Leer y escribir archivos BVH. |
+| `app/motor/estilo.py` | "Dibujado a mano": el tembleque de líneas (*line boil*), 3 deformaciones que se turnan 10 veces por segundo. |
+| `app/motor/escenario.py` | Fondos con vida: una parte detrás de los personajes y otra delante (profundidad). |
+| `app/motor/sonidos.py` | Efectos de sonido sintetizados y en qué pulso suena cada uno según el movimiento. |
 | `app/motor/catalogo.py` | Movimientos, fondos y sus valores por defecto. |
 | `app/static/` | Páginas (HTML/CSS/JS sin frameworks ni compilación). |
 | `app/pruebas/` | Pruebas automáticas y fotos de ejemplo. |
@@ -32,6 +35,8 @@ Decisiones que conviene mantener:
 
 - **Todo local y en archivos.** Cada personaje es una carpeta con `info.json`. No hay base de datos: es fácil de respaldar (copiar `datos/`) y de inspeccionar. Si algún día hace falta, `leer_info` / `guardar_info` son el único punto a cambiar.
 - **Un trabajo a la vez.** Crear videos usa todo el procesador. La cola está en memoria. Al reiniciar, `recuperar_pendientes()` retoma lo que quedó a medias.
+- **El video se arma por capas.** Animated Drawings dibuja a los personajes con esqueleto sobre transparente (un `.mov` con PNG, guardado a 30 cuadros por segundo por `EscritorCapa`). Cada cuadro se arma así: fondo → fondo con vida de atrás → sombras de contacto → personajes con esqueleto (con tembleque) → gelatina con sus efectos → fondo con vida de adelante. El audio se arma igual: música + efectos de sonido.
+- **Rapidez:** lo difuminado (fuego, brillos) se calcula a 1/3 del tamaño y se agranda, y las mezclas trabajan solo en la zona donde hay algo. Si un efecto nuevo vuelve lento el render, midan con `cProfile` (así se encontró que el fuego tomaba 12 de 27 segundos).
 - **El render corre en otro proceso.** OpenGL (OSMesa) y Animated Drawings quedan aislados, y si algo falla no se cae el servidor.
 - **El modo función es para teles.** `static/funcion.html` está escrito en JavaScript clásico (ES5, sin `comun.js`) y CSS sin `inset`/`gap`/`clamp`, porque los navegadores de Smart TV suelen ser versiones viejas de Chrome. Se maneja con el control: OK y flechas.
 - **Al pulso.** Los movimientos gelatina y los bailes propios se miden en pulsos de la canción, no en segundos, así van al compás de cualquier canción, también de las propias (su ritmo lo estima `canciones.estimar_bpm`).

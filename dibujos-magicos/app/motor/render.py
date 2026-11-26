@@ -27,7 +27,9 @@ import cv2
 import numpy as np
 import yaml
 
-from motor import bailes, catalogo, efectos, musica
+from motor import bailes, catalogo, efectos, musica, sonidos
+from motor.escenario import Escenario
+from motor.estilo import Temblor
 
 ANCHO, ALTO, FPS = 1280, 720, 30
 SEGUNDOS_MINIMOS = 7.5
@@ -127,11 +129,13 @@ def render_esqueletos(personajes, fondo, n_total, tmp, bpm, segundos):
         lista.append({"character_cfg": str(Path(p["carpeta"]).resolve() / "char_cfg.yaml"),
                       "motion_cfg": motion_cfg, "retarget_cfg": retarget})
 
-    crudo = Path(tmp) / "esqueletos.mp4"
-    vista = {"USE_MESA": True, "WINDOW_DIMENSIONS": [ANCHO, ALTO], "BACKGROUND_IMAGE": catalogo.ruta_fondo(fondo)}
+    capa = Path(tmp) / "esqueletos.mov"   # Animated Drawings pide .mp4 en la configuración; EscritorCapa usa .mov
+    # sin fondo y con transparencia: el fondo (con vida) y las sombras los ponemos nosotros
+    vista = {"USE_MESA": True, "WINDOW_DIMENSIONS": [ANCHO, ALTO], "CLEAR_COLOR": [1.0, 1.0, 1.0, 0.0]}
     vista.update(cam)
     cfg = {"scene": {"ANIMATED_CHARACTERS": lista}, "view": vista,
-           "controller": {"MODE": "video_render", "OUTPUT_VIDEO_PATH": str(crudo), "OUTPUT_VIDEO_CODEC": "mp4v"}}
+           "controller": {"MODE": "video_render", "OUTPUT_VIDEO_PATH": str(capa.with_suffix(".mp4")),
+                          "OUTPUT_VIDEO_CODEC": "mp4v"}}
     ruta_cfg = Path(tmp) / "mvc.yaml"
     ruta_cfg.write_text(yaml.dump(cfg))
 
@@ -146,33 +150,100 @@ def render_esqueletos(personajes, fondo, n_total, tmp, bpm, segundos):
         return r
     tqdm_mod.tqdm.update = update
 
+    from animated_drawings.controller import video_render_controller as vrc
+    vrc.VideoWriter.create_video_writer = staticmethod(lambda controlador: EscritorCapa(controlador))
+
     antes = os.getcwd()
     os.chdir(catalogo.AD_ROOT)
     try:
         ad_render.start(str(ruta_cfg))
     finally:
         os.chdir(antes)
-    return crudo
+    return capa
 
 
-def cuadros_base(crudo, fondo_img, total, vueltas):
-    """Da `total` cuadros BGR: los del video de Animated Drawings (repetido) o el fondo quieto."""
-    if crudo is None:
-        for _ in range(total):
-            yield fondo_img.copy()
-        return
-    p = subprocess.Popen(["ffmpeg", "-v", "error", "-stream_loop", str(vueltas - 1), "-i", str(crudo),
-                          "-vf", f"fps={FPS},scale={ANCHO}:{ALTO}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
-                         stdout=subprocess.PIPE)
-    tam = ANCHO * ALTO * 3
-    ultimo = fondo_img
+class EscritorCapa:
+    """
+    Reemplaza al grabador de video de Animated Drawings: guarda los cuadros con transparencia
+    (PNG dentro de un .mov) y solo a 30 por segundo, aunque la captura de movimiento venga a 120.
+    """
+
+    def __init__(self, controlador):
+        self.ruta = Path(controlador.cfg.output_video_path).with_suffix(".mov")   # .mov admite transparencia
+        self.fps_origen = 1.0 / controlador.delta_t
+        self.i, self.ultimo = 0, -1
+        w, h = controlador.video_width, controlador.video_height
+        self.p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", f"{w}x{h}",
+                                   "-r", str(FPS), "-i", "-", "-c:v", "png", str(self.ruta)], stdin=subprocess.PIPE)
+
+    def process_frame(self, cuadro):
+        destino = int(self.i * FPS / self.fps_origen)
+        self.i += 1
+        if destino != self.ultimo:
+            self.ultimo = destino
+            self.p.stdin.write(np.ascontiguousarray(cuadro).tobytes())
+
+    def cleanup(self):
+        self.p.stdin.close()
+        self.p.wait()
+
+
+def cuadros_capa(capa, total, vueltas):
+    """Da `total` cuadros BGRA de la capa de personajes con esqueleto (repetida si hace falta)."""
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-stream_loop", str(vueltas - 1), "-i", str(capa),
+                          "-f", "rawvideo", "-pix_fmt", "bgra", "-"], stdout=subprocess.PIPE)
+    tam = ANCHO * ALTO * 4
+    ultimo = np.zeros((ALTO, ANCHO, 4), np.uint8)
     for _ in range(total):
         datos = p.stdout.read(tam)
         if len(datos) == tam:
-            ultimo = np.frombuffer(datos, np.uint8).reshape(ALTO, ANCHO, 3).copy()
-        yield ultimo.copy()
+            ultimo = np.frombuffer(datos, np.uint8).reshape(ALTO, ANCHO, 4)
+        yield ultimo
     p.stdout.close()
     p.wait()
+
+
+def poner_capa(cuadro, capa):
+    """Pega la capa BGRA sobre el cuadro, solo en la zona donde hay algo."""
+    alfa = capa[:, :, 3]
+    filas, cols = np.where(alfa.any(axis=1))[0], np.where(alfa.any(axis=0))[0]
+    if not len(filas):
+        return
+    y0, y1, x0, x1 = filas[0], filas[-1] + 1, cols[0], cols[-1] + 1
+    a = alfa[y0:y1, x0:x1, None].astype(np.float32) / 255.0
+    zona = cuadro[y0:y1, x0:x1].astype(np.float32)
+    cuadro[y0:y1, x0:x1] = (capa[y0:y1, x0:x1, :3] * a + zona * (1 - a)).astype(np.uint8)
+
+
+class SombrasDeContacto:
+    """
+    Sombra debajo de cada personaje con esqueleto: sigue sus pies, y cuando salta se achica
+    y se aclara. El suelo de cada uno es lo más abajo que han llegado sus pies.
+    """
+
+    def __init__(self, lugares):
+        n = len(lugares)
+        mitad = (lugares[1] - lugares[0]) / 2 if n > 1 else 0.5
+        self.franjas = [(max(0, int((lugar - mitad) * ANCHO)), min(ANCHO, int((lugar + mitad) * ANCHO)))
+                        for lugar in lugares]
+        self.suelo = [None] * n
+
+    def dibujar(self, cuadro, alfa):
+        for i, (x0, x1) in enumerate(self.franjas):
+            zona = alfa[:, x0:x1] > 60
+            filas = np.where(zona.any(axis=1))[0]
+            if not len(filas):
+                continue
+            pies = filas[-1]
+            alto = pies - filas[0]
+            abajo = zona[max(0, pies - int(alto * 0.12)):pies + 1]
+            cols = np.where(abajo.any(axis=0))[0]
+            if not len(cols):
+                continue
+            self.suelo[i] = pies if self.suelo[i] is None else max(self.suelo[i], pies)
+            altura = self.suelo[i] - pies
+            ancho = max(30.0, (cols[-1] - cols[0]) * 1.1) * max(0.4, 1 - altura / 250)
+            sombra(cuadro, x0 + (cols[0] + cols[-1]) / 2, self.suelo[i] + 4, ancho, 0.28 * max(0.25, 1 - altura / 200))
 
 
 # ---------------------------------------------------------------- gelatina (propio)
@@ -188,7 +259,7 @@ def recorte_rgba(carpeta):
     return tex[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 
 
-def pegar(fondo, img, cx, base_y, pivote=None):
+def pegar(fondo, img, cx, base_y, pivote=None, opacidad=1.0):
     """Pega img (BGRA) sobre fondo (BGR) poniendo su punto de apoyo en (cx, base_y)."""
     h, w = img.shape[:2]
     px, py = pivote if pivote else (w / 2, h)
@@ -198,7 +269,7 @@ def pegar(fondo, img, cx, base_y, pivote=None):
     if fx0 >= fx1 or fy0 >= fy1:
         return
     parte = img[fy0 - y0:fy1 - y0, fx0 - x0:fx1 - x0]
-    a = parte[:, :, 3:4].astype(np.float32) / 255.0
+    a = parte[:, :, 3:4].astype(np.float32) / 255.0 * opacidad
     zona = fondo[fy0:fy1, fx0:fx1].astype(np.float32)
     fondo[fy0:fy1, fx0:fx1] = (parte[:, :, :3] * a + zona * (1 - a)).astype(np.uint8)
 
@@ -259,8 +330,9 @@ def chispitas(fondo, t, n=14, semilla=7):
 class Gelatina:
     """Un personaje gelatina: su recorte, su lugar y cómo se mueve al ritmo (pulsos por minuto)."""
 
-    def __init__(self, carpeta, movimiento, lugar, n_total, bpm):
+    def __init__(self, carpeta, movimiento, lugar, n_total, bpm, temblor=None):
         self.mov = movimiento
+        self.temblor = temblor
         self.pulso = 60.0 / bpm
         pj = recorte_rgba(carpeta)
         ph, pw = pj.shape[:2]
@@ -299,16 +371,29 @@ class Gelatina:
 
 
     def dibujar(self, cuadro, s):
+        dibujo = self.temblor.aplicar(self.img, s) if self.temblor else self.img
         ph, pw = self.img.shape[:2]
         b = s / self.pulso  # cuántos pulsos de música van
         cx, base, sx, sy, ang, onda = self.cx, self.suelo, 1.0, 1.0, 0.0, 0.0
         if self.mov == "rebotar":
+            # principios de animación: aplastar al tocar el suelo, estirarse cuando va rápido
+            # (conservando el "volumen"), líneas de velocidad y un cuadro de impacto al caer
             fase = (b % 2) / 2
             altura = math.sin(math.pi * fase)
-            base = self.suelo - 0.32 * ph * altura
-            aplasta = max(0.0, 1 - altura / 0.22)
-            sy, sx = 1 - 0.16 * aplasta + 0.06 * altura, 1 + 0.12 * aplasta - 0.03 * altura
+            vel = math.cos(math.pi * fase)                  # + sube, - baja
+            base = self.suelo - 0.34 * ph * altura
+            estira = 0.22 * abs(vel) * min(1.0, altura / 0.15)
+            aplasta = max(0.0, 1 - altura / 0.12)
+            sy = 1 + estira - 0.24 * aplasta
+            sx = 1 / max(0.6, sy) ** 0.8
             sombra(cuadro, cx, self.suelo, pw * (0.9 - 0.35 * altura), 0.35 - 0.15 * altura)
+            if abs(vel) > 0.55 and altura > 0.12:
+                efectos.lineas_velocidad(cuadro, cx, base - ph * sy / 2, pw * sx, ph * sy, vel > 0, s)
+            img, pivote = transformar(dibujo, sx, sy, 0, onda)
+            pegar(cuadro, img, cx, base, pivote)
+            if b % 2 < 0.35 and b > 0.5:
+                efectos.impacto(cuadro, cx, self.suelo, pw, (b % 2) / 0.35)
+            return
         elif self.mov == "bambolear":
             onda = 0.16 * pw * math.sin(math.pi * b)
             sy = 1 + 0.04 * math.sin(2 * math.pi * b)
@@ -328,7 +413,7 @@ class Gelatina:
             efectos.polvo(cuadro, cx, self.suelo, pw, s)
             if sx < 0.6:
                 efectos.rayitas(cuadro, cx, base - ph * 0.5, pw * 0.65, ph * 0.5, s)
-            img, pivote = transformar(self.img[:, ::-1] if espejo else self.img, sx, sy, 0, 0)
+            img, pivote = transformar(dibujo[:, ::-1] if espejo else dibujo, sx, sy, 0, 0)
             pegar(cuadro, img, cx, base, pivote)
             return
         elif self.mov == "nadar":
@@ -340,7 +425,7 @@ class Gelatina:
             onda = 0.05 * pw * math.sin(2 * math.pi * b)
             frente = cx + (pw * 0.45 if vel > 0 else -pw * 0.45)
             efectos.burbujas(cuadro, frente, base - ph * 0.5, s, semilla=int(self.cx))
-            img, pivote = transformar(self.img if vel > 0 else self.img[:, ::-1], sx, sy, ang, onda)
+            img, pivote = transformar(dibujo if vel > 0 else dibujo[:, ::-1], sx, sy, ang, onda)
             pegar(cuadro, img, cx, base, pivote)
             return
         elif self.mov == "cohete":
@@ -355,6 +440,8 @@ class Gelatina:
                 altura, fuerza = (k ** 2) * (self.suelo + ph * 0.2), 1.0
                 sy, sx = 1.12, 0.92
                 efectos.humo(cuadro, self.cx, self.suelo, pw, s, cantidad=max(0.0, 1 - 2 * k))
+                if 0.25 < k < 0.95:
+                    efectos.lineas_velocidad(cuadro, cx, self.suelo - altura - ph * 0.55, pw, ph, True, s)
             else:
                 k = (c - 5) / 3
                 altura, fuerza = ((1 - k) ** 2) * (self.suelo + ph * 0.2), 0.45
@@ -363,9 +450,11 @@ class Gelatina:
             ancho_boca, corrimiento, adentro = self.boca
             boca_x, boca_y = cx + corrimiento * sx, base - adentro * sy
             efectos.fuego(cuadro, boca_x, boca_y, ancho_boca * sx, s, fuerza)   # detrás del dibujo
-            img, pivote = transformar(self.img, sx, sy, 0, 0)
+            img, pivote = transformar(dibujo, sx, sy, 0, 0)
             pegar(cuadro, img, cx, base, pivote)
             efectos.resplandor(cuadro, boca_x, base, ancho_boca * 1.3, 0.35 + 0.3 * fuerza)  # ilumina al dibujo
+            if c < 0.3 and b > 1:
+                efectos.impacto(cuadro, cx, self.suelo, pw, c / 0.3)   # aterrizaje
             return
         elif self.mov == "voltereta":
             c = b % 4                                    # salta y da la vuelta en 2 pulsos, descansa 2
@@ -375,7 +464,15 @@ class Gelatina:
                 angulo = -360 * (k * k * (3 - 2 * k))    # empieza y termina suavecito
                 centro_y = self.suelo - ph / 2 - alto_salto
                 sombra(cuadro, cx, self.suelo, pw * (0.8 - 0.3 * math.sin(math.pi * k)), 0.25)
-                img, pivote = transformar(self.img, 1, 1, angulo, 0)
+                # estelas: copias más transparentes de dónde estaba hace un ratito (como en el anime)
+                for atras, opacidad in ((0.16, 0.18), (0.08, 0.32)):
+                    ka = max(0.0, k - atras)
+                    ang_a = -360 * (ka * ka * (3 - 2 * ka))
+                    cy_a = self.suelo - ph / 2 - math.sin(math.pi * ka) * 0.45 * ph
+                    ra = math.radians(ang_a)
+                    img_a, piv_a = transformar(dibujo, 1, 1, ang_a, 0)
+                    pegar(cuadro, img_a, cx + (ph / 2) * math.sin(ra), cy_a + (ph / 2) * math.cos(ra), piv_a, opacidad)
+                img, pivote = transformar(dibujo, 1, 1, angulo, 0)
                 a = math.radians(angulo)
                 # gira alrededor del centro: el punto de apoyo se mueve con el giro
                 px, py = cx + (ph / 2) * math.sin(a), centro_y + (ph / 2) * math.cos(a)
@@ -385,8 +482,9 @@ class Gelatina:
             aplasta = math.exp(-6 * k) * 0.2
             sy, sx = 1 - aplasta, 1 + aplasta * 0.7
             sombra(cuadro, cx, self.suelo, pw * 0.85, 0.3)
-            img, pivote = transformar(self.img, sx, sy, 0, 0)
+            img, pivote = transformar(dibujo, sx, sy, 0, 0)
             pegar(cuadro, img, cx, self.suelo, pivote)
+            efectos.impacto(cuadro, cx, self.suelo, pw, k / 0.3)
             efectos.estrellas(cuadro, cx, self.suelo - ph * 0.55, pw, k)  # encima del dibujo
             return
         else:  # menear
@@ -397,11 +495,38 @@ class Gelatina:
             base = self.suelo - 0.08 * ph * salto
             onda = 0.06 * pw * math.sin(math.pi * b + 1)
             sombra(cuadro, cx, self.suelo, pw * 0.85, 0.3 - 0.1 * salto)
-        img, pivote = transformar(self.img, sx, sy, ang, onda)
+        img, pivote = transformar(dibujo, sx, sy, ang, onda)
         pegar(cuadro, img, cx, base, pivote)
 
 
 # ---------------------------------------------------------------- escena completa
+
+def armar_audio(escena, cancion, segundos, bpm, personajes, tmp):
+    """Música (si hay) + efectos de sonido (si están activados). Devuelve la ruta del .wav o None."""
+    import wave
+    con_sonidos = escena.get("sonidos", True)
+    if not cancion and not con_sonidos:
+        return None
+    n = int(segundos * musica.SR)
+    if cancion:
+        musica.escribir_wav(cancion, segundos, tmp / "musica.wav")
+        with wave.open(str(tmp / "musica.wav")) as w:
+            datos = np.frombuffer(w.readframes(w.getnframes()), "<i2").reshape(-1, w.getnchannels())
+        pista = np.zeros((n, 2), np.float32)
+        m = min(n, len(datos))
+        pista[:m] = datos[:m, :2] / 32768.0
+    else:
+        pista = np.zeros((n, 2), np.float32)
+    if con_sonidos:
+        pista = sonidos.mezclar(pista, sonidos.eventos([p["movimiento"] for p in personajes], bpm, segundos))
+    ruta = tmp / "audio.wav"
+    with wave.open(str(ruta), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(musica.SR)
+        w.writeframes((np.clip(pista, -1, 1) * 32000).astype("<i2").tobytes())
+    return ruta
+
 
 def render(escena):
     pjs = escena["personajes"]
@@ -412,6 +537,9 @@ def render(escena):
     if not musica.existe(cancion):
         cancion = None
     fondo_img = cv2.resize(cv2.imread(catalogo.ruta_fondo(escena["fondo"])), (ANCHO, ALTO))
+    a_mano = escena.get("a_mano", True)
+    temblor = Temblor() if a_mano else None
+    escenario = Escenario(escena["fondo"], ANCHO, ALTO)
     esqueletos = [p for p in pjs if p["modo"] == "esqueleto"]
     gelatinas = [p for p in pjs if p["modo"] != "esqueleto"]
 
@@ -419,10 +547,10 @@ def render(escena):
     segundos_musicales = musica.duracion_en_compases(cancion, 8.0) if cancion else 8.0
 
     with tempfile.TemporaryDirectory() as tmp:
-        crudo, vueltas = None, 1
+        capa, vueltas = None, 1
         if esqueletos:
-            crudo = render_esqueletos(esqueletos, escena["fondo"], n, tmp, bpm, segundos_musicales)
-            d = duracion(crudo)
+            capa = render_esqueletos(esqueletos, escena["fondo"], n, tmp, bpm, segundos_musicales)
+            d = duracion(capa)
             vueltas = max(1, math.ceil(SEGUNDOS_MINIMOS / d))  # los movimientos cortos se repiten
             segundos = d * vueltas
         else:
@@ -430,25 +558,37 @@ def render(escena):
         total = int(round(segundos * FPS))
         inicio = 55 if esqueletos else 5
 
-        figuras = [Gelatina(p["carpeta"], p["movimiento"], p["lugar"], n, bpm) for p in gelatinas]
+        figuras = [Gelatina(p["carpeta"], p["movimiento"], p["lugar"], n, bpm, temblor) for p in gelatinas]
+        sombras = SombrasDeContacto([p["lugar"] for p in esqueletos]) if esqueletos else None
+        capas = cuadros_capa(capa, total, vueltas) if capa else None
         flota = any(p["movimiento"] == "flotar" for p in gelatinas)
 
         entrada_audio = []
-        if cancion:
-            wav = Path(tmp) / "musica.wav"
-            musica.escribir_wav(cancion, segundos, wav)
+        wav = armar_audio(escena, cancion, segundos, bpm, pjs, Path(tmp))
+        if wav:
             entrada_audio = ["-i", str(wav), "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "160k", "-shortest"]
         ff = subprocess.Popen(
             ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{ANCHO}x{ALTO}",
              "-r", str(FPS), "-i", "-"] + entrada_audio +
             ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
              "-movflags", "+faststart", str(escena["salida"])], stdin=subprocess.PIPE)
-        for f, cuadro in enumerate(cuadros_base(crudo, fondo_img, total, vueltas)):
+        for f in range(total):
             s = f / FPS
+            # capas, de atrás hacia adelante
+            cuadro = fondo_img.copy()
+            escenario.atras_lejos(cuadro, s)
+            escenario.atras(cuadro, s)
             if flota:
                 chispitas(cuadro, s)
+            if capas:
+                rgba = next(capas)
+                if temblor:
+                    rgba = temblor.aplicar(rgba, s)
+                sombras.dibujar(cuadro, rgba[:, :, 3])
+                poner_capa(cuadro, rgba)
             for g in figuras:
                 g.dibujar(cuadro, s)
+            escenario.adelante(cuadro, s)
             ff.stdin.write(cuadro.tobytes())
             if f % 15 == 0:
                 progreso(inicio + (95 - inicio) * f / total)

@@ -103,6 +103,10 @@
         <h3>Música</h3>
         <div class="opciones" id="musicas"></div>
         <div id="lugarMuestra"></div>
+        <div class="opciones-extra">
+          <label class="casilla"><input type="checkbox" id="aMano" checked><span>✏️ Dibujado a mano<br><span class="suave pequeno">Las líneas tiemblan un poquito, como en los dibujos animados.</span></span></label>
+          <label class="casilla"><input type="checkbox" id="conSonidos" checked><span>🔊 Efectos de sonido<br><span class="suave pequeno">Boing, fiuuu, aplausos…</span></span></label>
+        </div>
         <div id="errorAnimar" class="aviso error oculto"></div>
         <div id="trabajo" class="oculto" style="display:flex;flex-direction:column;gap:.4rem">
           <div class="barra-progreso"><div id="barraTrabajo"></div></div>
@@ -371,7 +375,7 @@ document.getElementById("btnAnimar").addEventListener("click", async () => {
   if (!(await guardar())) { err.textContent = "Antes de animar hay que arreglar esto: " + document.getElementById("estadoGuardar").textContent; err.classList.remove("oculto"); return; }
   try {
     pararMuestra();
-    const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel, musica: musicaSel });
+    const t = await apiJSON(`/api/personajes/${PID}/videos`, "POST", { movimiento: movSel, fondo: fondoSel, musica: musicaSel, a_mano: document.getElementById("aMano").checked, sonidos: document.getElementById("conSonidos").checked });
     seguirTrabajo(t.id);
   } catch (e) { err.textContent = e.message; err.classList.remove("oculto"); }
 });

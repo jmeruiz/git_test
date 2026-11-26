@@ -18,9 +18,16 @@ def _azar(k, sal=0.0):
 
 
 def _mezclar(cuadro, capa, mascara, opacidad):
-    """Pega `capa` sobre `cuadro` donde `mascara` > 0, con la opacidad dada (0 a 1)."""
-    a = (cv2.GaussianBlur(mascara, (0, 0), 2).astype(np.float32) / 255.0 * opacidad)[:, :, None]
-    cuadro[:] = (capa.astype(np.float32) * a + cuadro.astype(np.float32) * (1 - a)).astype(np.uint8)
+    """Pega `capa` sobre `cuadro` donde `mascara` > 0, con la opacidad dada (0 a 1). Solo trabaja en esa zona."""
+    filas, cols = np.where(mascara.any(axis=1))[0], np.where(mascara.any(axis=0))[0]
+    if not len(filas):
+        return
+    h, w = mascara.shape
+    y0, y1 = max(0, filas[0] - 6), min(h, filas[-1] + 7)
+    x0, x1 = max(0, cols[0] - 6), min(w, cols[-1] + 7)
+    a = (cv2.GaussianBlur(mascara[y0:y1, x0:x1], (0, 0), 2).astype(np.float32) / 255.0 * opacidad)[:, :, None]
+    zona = cuadro[y0:y1, x0:x1]
+    zona[:] = (capa[y0:y1, x0:x1].astype(np.float32) * a + zona.astype(np.float32) * (1 - a)).astype(np.uint8)
 
 
 def _llama(ancho, largo, x, y, s, fase):
@@ -60,32 +67,42 @@ def fuego(cuadro, x, y, ancho, s, fuerza=1.0):
         return
     x0, y0, x1, y1 = r
     h, w = y1 - y0, x1 - x0
-    color = np.zeros((h, w, 3), np.float32)   # color ya multiplicado por su transparencia
-    alfa = np.zeros((h, w), np.float32)
+    # todo lo difuminado se calcula a 1/3 del tamaño y después se agranda: es borroso
+    # a propósito, así que no se nota, y es unas 9 veces más rápido
+    q = 1 / 3
+    hc, wc = max(2, int(h * q)), max(2, int(w * q))
+    color = np.zeros((hc, wc, 3), np.float32)   # color ya multiplicado por su transparencia
+    alfa = np.zeros((hc, wc), np.float32)
     capas = (  # (ancho, largo, color BGR, opacidad, difuminado)
         (1.00, 1.00, (35, 85, 240), 0.80, 0.10),
         (0.74, 0.74, (20, 150, 255), 0.90, 0.07),
         (0.46, 0.42, (170, 235, 255), 0.95, 0.05),
     )
     for i, (fa, fl, bgr, op, dif) in enumerate(capas):
-        m = np.zeros((h, w), np.uint8)
-        forma = _llama(ancho * fa, largo * fl, x, y, s, fase=i * 1.3) - np.array([x0, y0])
+        m = np.zeros((hc, wc), np.uint8)
+        forma = (_llama(ancho * fa, largo * fl, x, y, s, fase=i * 1.3) - np.array([x0, y0])) * q
         cv2.fillPoly(m, [forma.astype(np.int32)], 255, cv2.LINE_AA)
-        m = cv2.GaussianBlur(m, (0, 0), max(1.0, ancho * dif)).astype(np.float32) / 255.0 * op
+        m = cv2.GaussianBlur(m, (0, 0), max(0.6, ancho * dif * q)).astype(np.float32) / 255.0 * op
         color = color * (1 - m[..., None]) + np.array(bgr, np.float32)[None, None] / 255.0 * m[..., None]
         alfa = alfa * (1 - m) + m
-    zona = cuadro[y0:y1, x0:x1].astype(np.float32) / 255.0
-    zona = zona * (1 - alfa[..., None]) + color
 
     # resplandor y chispas: se suman como luz ("screen"), brillan más sobre fondos oscuros
-    luz = np.zeros((h, w), np.uint8)
-    cv2.ellipse(luz, (int(x - x0), int(y - y0 + largo * 0.25)), (int(ancho * 0.95), int(largo * 0.55)), 0, 0, 360, 255, -1)
+    luz = np.zeros((hc, wc), np.uint8)
+    cv2.ellipse(luz, (int((x - x0) * q), int((y - y0 + largo * 0.25) * q)), (int(ancho * 0.95 * q), int(largo * 0.55 * q)),
+                0, 0, 360, 255, -1)
     for k in range(int(12 * fuerza) + 3):
         edad = (s * 1.8 + _azar(k, 7)) % 1.0
         px = x - x0 + (_azar(k, 8) - 0.5) * ancho * (0.5 + 1.1 * edad)
         py = y - y0 + largo * (0.45 + 0.75 * edad)
-        cv2.circle(luz, (int(px), int(py)), max(2, int(4 * (1 - edad))), int(255 * (1 - edad)), -1, cv2.LINE_AA)
-    luz = cv2.GaussianBlur(luz, (0, 0), max(2.0, ancho * 0.18)).astype(np.float32) / 255.0 * (0.35 + 0.35 * fuerza)
+        cv2.circle(luz, (int(px * q), int(py * q)), max(1, int(4 * q * (1 - edad)) + 1), int(255 * (1 - edad)), -1, cv2.LINE_AA)
+    luz = cv2.GaussianBlur(luz, (0, 0), max(1.0, ancho * 0.18 * q)).astype(np.float32) / 255.0 * (0.35 + 0.35 * fuerza)
+
+    # de vuelta al tamaño real
+    color = cv2.resize(color, (w, h), interpolation=cv2.INTER_LINEAR)
+    alfa = cv2.resize(alfa, (w, h), interpolation=cv2.INTER_LINEAR)
+    luz = cv2.resize(luz, (w, h), interpolation=cv2.INTER_LINEAR)
+    zona = cuadro[y0:y1, x0:x1].astype(np.float32) / 255.0
+    zona = zona * (1 - alfa[..., None]) + color
     brillo = luz[..., None] * np.array((60, 170, 255), np.float32)[None, None] / 255.0
     zona = 1 - (1 - zona) * (1 - brillo)
     cuadro[y0:y1, x0:x1] = np.clip(zona * 255, 0, 255).astype(np.uint8)
@@ -176,3 +193,44 @@ def estrellas(cuadro, x, y, ancho, k, n=6):
         d = ancho * (0.6 + 0.7 * k)
         px, py = x - math.cos(a) * d, y - math.sin(a) * d * 0.8
         _estrella(cuadro, int(px), int(py), int(22 * (1 - k) + 8), colores[i % len(colores)])
+
+
+def lineas_velocidad(cuadro, x, y, ancho, alto, hacia_arriba, s, n=5):
+    """
+    Líneas de velocidad (como en el anime y los cómics): rayitas detrás de algo que va rápido.
+    Si sube, van debajo; si baja, van arriba.
+    """
+    capa = cuadro.copy()
+    mascara = np.zeros(cuadro.shape[:2], np.uint8)
+    lado = 1 if hacia_arriba else -1
+    for k in range(n):
+        px = x + (k - (n - 1) / 2) * ancho * 0.22 + math.sin(s * 20 + k) * 3
+        inicio = y + lado * (alto * 0.55 + 10 * _azar(k, 70))
+        largo = alto * (0.25 + 0.35 * _azar(k + int(s * 12), 71))
+        p0, p1 = (int(px), int(inicio)), (int(px), int(inicio + lado * largo))
+        cv2.line(capa, p0, p1, (255, 255, 255), 4, cv2.LINE_AA)
+        cv2.line(mascara, p0, p1, 200, 4, cv2.LINE_AA)
+    _mezclar(cuadro, capa, mascara, 0.75)
+
+
+def impacto(cuadro, x, y, ancho, k, n=9):
+    """
+    Golpe al aterrizar (el "cuadro de impacto" del anime): un abanico de rayitas que sale del
+    punto de contacto y dos nubecitas de polvo. k de 0 a 1 = lo que va del golpe.
+    """
+    if k >= 1:
+        return
+    capa = cuadro.copy()
+    mascara = np.zeros(cuadro.shape[:2], np.uint8)
+    for i in range(n):
+        a = math.pi * (0.08 + 0.84 * i / (n - 1))            # abanico hacia arriba
+        r0, r1 = ancho * (0.55 + 0.4 * k), ancho * (0.75 + 0.7 * k)
+        p0 = (int(x - math.cos(a) * r0), int(y - math.sin(a) * r0 * 0.45))
+        p1 = (int(x - math.cos(a) * r1), int(y - math.sin(a) * r1 * 0.45))
+        cv2.line(capa, p0, p1, (255, 255, 255), 5, cv2.LINE_AA)
+        cv2.line(mascara, p0, p1, int(255 * (1 - k)), 5, cv2.LINE_AA)
+    for lado in (-1, 1):
+        cx, r = int(x + lado * ancho * (0.45 + 0.5 * k)), int(ancho * (0.08 + 0.12 * k))
+        cv2.circle(capa, (cx, int(y - r * 0.5)), r, (225, 230, 235), -1, cv2.LINE_AA)
+        cv2.circle(mascara, (cx, int(y - r * 0.5)), r, int(220 * (1 - k)), -1, cv2.LINE_AA)
+    _mezclar(cuadro, capa, mascara, 0.85)

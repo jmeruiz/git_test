@@ -191,7 +191,7 @@ def hacer_video(t):
     (c / "videos").mkdir(exist_ok=True)
     vid = nuevo_id()
     archivo, mini = f"{t['movimiento']}-{t['fondo']}-{vid}.mp4", f"{vid}.jpg"
-    escena = {"fondo": t["fondo"], "musica": t["musica"],
+    escena = {"fondo": t["fondo"], "musica": t["musica"], "a_mano": t.get("a_mano", True), "sonidos": t.get("sonidos", True),
               "personajes": [{"carpeta": str(c), "modo": t["modo"], "movimiento": t["movimiento"]}],
               "salida": str(c / "videos" / archivo), "miniatura": str(c / "videos" / mini)}
     correr_render(t, escena, c)
@@ -212,6 +212,7 @@ def hacer_fiesta(t):
     c = FIESTAS / t["fiesta"]
     info = leer_info(c)
     escena = {"fondo": info["fondo"], "musica": info["musica"],
+              "a_mano": info.get("a_mano", True), "sonidos": info.get("sonidos", True),
               "personajes": [{"carpeta": str(PERSONAJES / p["id"]), "modo": p["modo"], "movimiento": p["movimiento"]}
                              for p in info["personajes"]],
               "salida": str(c / "fiesta.mp4"), "miniatura": str(c / "fiesta.jpg")}
@@ -501,7 +502,8 @@ def crear_video(pid):
     cancion = datos.get("musica")
     if not musica.existe(cancion):
         cancion = "ninguna"
-    t = encolar("video", pid, modo=modo, movimiento=mov["id"], fondo=fondo, musica=cancion)
+    t = encolar("video", pid, modo=modo, movimiento=mov["id"], fondo=fondo, musica=cancion,
+                a_mano=bool(datos.get("a_mano", True)), sonidos=bool(datos.get("sonidos", True)))
     return jsonify(t), 202
 
 
@@ -587,7 +589,8 @@ def crear_fiesta():
     c = FIESTAS / fid
     c.mkdir(parents=True)
     info = {"id": fid, "personajes": personajes, "movimiento": baile["id"], "movimiento_nombre": baile["nombre"],
-            "fondo": datos.get("fondo") or "parque", "musica": cancion, "creado": ahora(), "estado": "creando"}
+            "fondo": datos.get("fondo") or "parque", "musica": cancion, "creado": ahora(), "estado": "creando",
+            "a_mano": bool(datos.get("a_mano", True)), "sonidos": bool(datos.get("sonidos", True))}
     guardar_info(c, info)
     t = encolar("fiesta", fiesta=fid)
     return jsonify(dict(publico_fiesta(info), trabajo=t["id"])), 202
