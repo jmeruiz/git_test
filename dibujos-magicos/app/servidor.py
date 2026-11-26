@@ -601,9 +601,8 @@ def borrar_fiesta(fid):
     return jsonify(ok=True)
 
 
-@app.get("/api/funcion")
-def lista_funcion():
-    """Todos los videos, para el modo función (tele)."""
+def videos_funcion():
+    """Todos los videos y fiestas, del más nuevo al más viejo."""
     res = []
     for c in PERSONAJES.iterdir():
         if not (c / "info.json").exists():
@@ -625,7 +624,39 @@ def lista_funcion():
             res.append({"url": f"/datos/fiestas/{f['id']}/fiesta.mp4", "nombre": "¡Fiesta!",
                         "artista": "", "invitados": nombres, "creado": f["creado"]})
     res.sort(key=lambda x: x["creado"], reverse=True)
-    return jsonify(res)
+    return res
+
+
+@app.get("/api/funcion")
+def lista_funcion():
+    """Todos los videos, para el modo función (tele)."""
+    return jsonify(videos_funcion())
+
+
+# ------------------------------------------------------------------ celular → tele
+# El modo función pregunta cada pocos segundos; el celular puede pedirle que ponga un video ya.
+tele = {"n": 0, "pedido": None, "visto": 0.0}
+
+
+@app.get("/api/tele")
+def estado_tele():
+    tele["visto"] = time.time()
+    return jsonify(n=tele["n"], pedido=tele["pedido"], total=len(videos_funcion()))
+
+
+@app.post("/api/tele")
+def pedir_a_tele():
+    url = (request.get_json(force=True) or {}).get("url", "")
+    video = next((v for v in videos_funcion() if v["url"] == url), None)
+    if not video:
+        return jsonify(error="Ese video ya no existe."), 404
+    tele["n"] += 1
+    tele["pedido"] = video
+    conectada = time.time() - tele["visto"] < 10
+    return jsonify(ok=True, conectada=conectada)
+
+
+
 
 
 def recuperar_pendientes():

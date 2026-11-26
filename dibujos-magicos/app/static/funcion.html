@@ -82,7 +82,10 @@ a:focus { outline: 4px solid #ffc93c; outline-offset: 4px; }
     var x = new XMLHttpRequest();
     x.open("GET", "/api/funcion");
     x.onload = function () {
+      // al refrescar la lista, seguir con el mismo video aunque cambie de posición
+      var actual = lista[i] ? lista[i].url : null;
       try { lista = JSON.parse(x.responseText); } catch (e) { lista = []; }
+      if (actual) { for (var k = 0; k < lista.length; k++) { if (lista[k].url === actual) { i = k; break; } } }
       $("cuantos").textContent = lista.length
         ? lista.length + (lista.length === 1 ? " video listo" : " videos listos")
         : "Todavía no hay videos. Creen uno desde el celular o la compu.";
@@ -186,7 +189,41 @@ a:focus { outline: 4px solid #ffc93c; outline-offset: 4px; }
     }
   });
 
+  // ---------------------------------------------------------- pedidos desde el celular
+  // Cada 3 segundos pregunta si alguien tocó "Ver en la tele" o si hay videos nuevos.
+  var ultimoPedido = null, totalConocido = null;
+
+  function verAhora(v) {
+    var idx = -1;
+    for (var k = 0; k < lista.length; k++) { if (lista[k].url === v.url) { idx = k; break; } }
+    if (idx < 0) { lista.unshift(v); idx = 0; }
+    if (!empezo) { empezar(); }
+    mostrar(idx);
+    aviso("📱 Lo pidieron desde el celular", 3000);
+  }
+
+  function revisarTele() {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/tele");
+    x.onload = function () {
+      var d;
+      try { d = JSON.parse(x.responseText); } catch (e) { return; }
+      if (ultimoPedido === null) { ultimoPedido = d.n; }          // lo pedido antes de abrir la tele no cuenta
+      else if (d.n !== ultimoPedido) {
+        ultimoPedido = d.n;
+        if (d.pedido) verAhora(d.pedido);
+      }
+      if (totalConocido !== null && d.total !== totalConocido) {
+        pedirLista(function () { if (empezo && d.total > totalConocido) aviso("✨ ¡Hay un video nuevo!", 3000); });
+      }
+      totalConocido = d.total;
+    };
+    x.send();
+  }
+
   pedirLista();
+  revisarTele();
+  setInterval(revisarTele, 3000);
 })();
 </script>
 </body>

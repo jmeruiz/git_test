@@ -142,6 +142,7 @@ async function pintarFiestas() {
     const titulo = el("b", {}, `${f.movimiento_nombre} · ${fondos[f.fondo] || f.fondo}` + (canciones[f.musica] ? ` · ${canciones[f.musica]}` : ""));
     const quienes = el("span", { class: "suave pequeno" }, "Con " + juntar(f.personajes.map((p) => p.nombre)));
     const acciones = el("span", { class: "acciones" },
+      f.url ? botonTele(f.url) : null,
       f.url ? el("a", { class: "boton claro", href: f.url, download: "Fiesta.mp4" }, "⬇ Descargar") : null,
       el("button", { class: "boton peligro", type: "button", onclick: async () => {
         if (!confirm("¿Borrar esta fiesta?")) return;

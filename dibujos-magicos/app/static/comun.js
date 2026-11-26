@@ -56,3 +56,22 @@ function bloqueMuestra() {
     el("p", { class: "suave pequeno" }, "Toquen una canción para escuchar unos segundos. El video que esté sonando se pausa solo. ",
       el("a", { href: "/canciones" }, "＋ Agregar mis canciones")), a, caja);
 }
+
+// ---------------------------------------------------------------- tele
+// Pide a la tele (modo función) que ponga este video ya.
+async function verEnTele(url, boton) {
+  const texto = boton.textContent;
+  boton.disabled = true;
+  try {
+    const r = await apiJSON("/api/tele", "POST", { url });
+    boton.textContent = r.conectada ? "📺 ¡Ya va en la tele!" : "📺 Abran el modo función en la tele";
+  } catch (e) {
+    boton.textContent = e.message;
+  }
+  setTimeout(() => { boton.textContent = texto; boton.disabled = false; }, 3500);
+}
+function botonTele(url) {
+  const b = el("button", { class: "boton claro", type: "button" }, "📺 Ver en la tele");
+  b.addEventListener("click", () => verEnTele(url, b));
+  return b;
+}

@@ -414,6 +414,7 @@ function pintarVideos() {
     el("div", { class: "fila" },
       el("b", {}, [v.movimiento_nombre, fondos[v.fondo] || v.fondo, canciones[v.musica]].filter(Boolean).join(" · ")),
       el("span", { class: "acciones" },
+        botonTele(v.url),
         el("a", { class: "boton claro", href: v.url, download: `${info.nombre} - ${v.movimiento_nombre}.mp4` }, "⬇ Descargar"),
         el("button", { class: "boton peligro", type: "button", onclick: async () => {
           if (!confirm("¿Borrar este video?")) return;

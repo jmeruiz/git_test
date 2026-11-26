@@ -92,3 +92,10 @@ def test_video_y_fiesta_gelatina(servidor):
     assert servidor.cliente.delete(f"/api/fiestas/{fiestas[0]['id']}").status_code == 200
     assert servidor.cliente.delete(f"/api/personajes/{a}").status_code == 200
     assert servidor.cliente.get(f"/api/personajes/{a}").status_code == 404
+
+
+def test_pedir_video_a_la_tele(servidor):
+    r = servidor.cliente.post("/api/tele", json={"url": "/datos/no/existe.mp4"})
+    assert r.status_code == 404
+    antes = servidor.cliente.get("/api/tele").json
+    assert antes["total"] == 0 and antes["pedido"] is None

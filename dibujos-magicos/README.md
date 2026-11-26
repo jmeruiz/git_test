@@ -122,6 +122,8 @@ Botón **▶ Modo función**. Pasa todos los videos y fiestas uno tras otro, con
 2. **Smart TV**: abran el navegador de la tele y escriban la dirección que sale debajo del QR, agregando `/funcion` (por ejemplo `http://192.168.1.50:8000/funcion`). La tele tiene que estar en el mismo WiFi. Algunos navegadores de tele son lentos o no reproducen video; si pasa, usen otra opción.
 3. **Chromecast o Google TV**: en Chrome de la computadora, menú ⋮ → **Transmitir…** → elijan la tele y **Transmitir pestaña**. Luego abran el modo función.
 
+**A la tele no se le sube nada:** todo queda guardado en la computadora. La tele solo pasa los videos, y los nuevos que hagan desde el celular aparecen solos en unos segundos. Para ponerlo **ya**, toquen **📺 Ver en la tele** debajo de cualquier video o fiesta en el celular, y la tele lo pone enseguida.
+
 En la pantalla de inicio del modo función se puede apagar la música. Con las flechas ← → del teclado se cambia de video.
 
 ### Dos tipos de movimiento
